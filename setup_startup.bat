@@ -13,7 +13,7 @@ set "appDataDir=%APPDATA%\%AppName%"
 set "licenseFile=%appDataDir%\license.key"
 set "powershellExe=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"  :: Define PowerShell executable path
 
-:: Step 1: Check if script is running as Administrator
+:: Check if script is running as Administrator
 NET SESSION >nul 2>&1
 if %errorlevel% NEQ 0 (
     echo ========================================
@@ -24,7 +24,7 @@ if %errorlevel% NEQ 0 (
     exit /b
 )
 
-:: Step 2: Prompt for License Key
+:: Prompt for License Key
 echo ========================================
 echo Please enter your license key to continue.
 echo ========================================
@@ -38,7 +38,7 @@ if "%licenseKey%"=="" (
     exit /b
 )
 
-:: Step 3: Store License Key in AppData (hidden file)
+:: Store License Key in AppData (hidden file)
 echo ========================================
 echo Storing license key securely...
 echo ========================================
@@ -49,7 +49,7 @@ if not exist "%appDataDir%" (
 echo %licenseKey% > "%licenseFile%"
 
 
-:: Step 4: Ensure Program Files directory exists
+:: Ensure Program Files directory exists
 echo ========================================
 echo Ensuring that the target directory exists...
 echo ========================================
@@ -58,20 +58,20 @@ if not exist "%targetDir%" (
     mkdir "%targetDir%"
 )
 
-:: Step 5: Copy PowerShell script and batch script to Program Files
+:: Copy PowerShell script and batch script to Program Files
 echo ========================================
 echo Copying PowerShell script and batch file to %targetDir%...
 echo ========================================
 copy "%~dp0ensure_app_running.ps1" "%scriptPath%" /Y
 copy "%~dp0setup_startup.bat" "%batchScriptPath%" /Y
 
-:: Step 6: Set Execution Policy to allow script execution
+:: Set Execution Policy to allow script execution
 echo ========================================
 echo Ensuring that PowerShell script execution is allowed...
 echo ========================================
 powershell.exe -Command "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine -Force"
 
-:: Step 7: Create a Task Scheduler task to run at startup
+:: Create a Task Scheduler task to run at startup
 echo ========================================
 echo Creating Task Scheduler entry to run script at startup...
 echo ========================================
@@ -81,13 +81,31 @@ schtasks /create /tn "%taskName%" ^
     /ru "SYSTEM" ^
     /f
 
-:: Step 8: Optionally add the script to startup via the registry (fallback)
+:: Optionally add the script to startup via the registry (fallback)
 echo ========================================
 echo Optionally adding registry entry for startup...
 echo ========================================
 reg add "%regKey%" /v "%regValue%" /t REG_SZ /d "\"%powershellExe%\" -ExecutionPolicy Bypass -File \"%scriptPath%\"" /f
 
-:: Step 9: Final Confirmation and Reboot Prompt
+
+:: Disable Edge Swipe Gestures
+echo ========================================
+echo Edge swipe gestures have been disabled
+echo ========================================
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\EdgeUI" /v AllowEdgeSwipe /t REG_DWORD /d 0 /f
+
+:: Schedule a reboot at midnight
+schtasks /create /tn "ScheduledReboot" /tr "shutdown /r /f" /sc once /st 00:00 /f
+echo ========================================
+if %errorlevel% neq 0 (
+    echo Failed to schedule the reboot. Ensure Task Scheduler service is running.
+) else (
+    echo A reboot has been scheduled at midnight.
+)
+echo ========================================
+
+
+:: Final Confirmation and Reboot Prompt
 echo ========================================
 echo Setup complete. The Kiosk app will now run at system startup
 echo ========================================

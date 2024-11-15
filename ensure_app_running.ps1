@@ -24,7 +24,12 @@ $GitHubReleaseURL = "https://github.com/kickstart-engineering/ofresh-kiosk-app/r
 
 $WShell = New-Object -Com Wscript.Shell
 
-# Step 1: Wait for an active internet connection
+# Disable Edge Swipe Gestures
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\EdgeUI" -Name "AllowEdgeSwipe" -Value 0 -Force
+# Notify user
+Write-Host "Edge swipe gestures have been disabled."
+
+# Wait for an active internet connection
 Write-Output "========================================"
 Write-Output "Waiting for an active internet connection..."
 Write-Output "========================================"
