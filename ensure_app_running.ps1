@@ -22,6 +22,7 @@ $AppExecutable = "$AppDataPath\OfreshKioskApp.exe"
 $LicenseKeyFile = "$AppDataPath\license.key"
 $GitHubReleaseURL = "https://github.com/kickstart-engineering/ofresh-kiosk-app/releases/download/1.0.1/OfreshKioskApp-Setup-1.0.1.exe"
 
+$WShell = New-Object -Com Wscript.Shell
 
 # Step 1: Wait for an active internet connection
 Write-Output "========================================"
@@ -78,4 +79,6 @@ function Start-App {
 while ($true) {
     Start-App
     Start-Sleep -Seconds 15  # Check every 30 seconds if the app is running
+
+    $WShell.SendKeys("{SCROLLLOCK}");
 }
