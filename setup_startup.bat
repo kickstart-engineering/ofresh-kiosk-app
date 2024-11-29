@@ -12,43 +12,72 @@ set "regValue=%AppName%Startup"
 set "appDataDir=%APPDATA%\%AppName%"
 set "licenseFile=%appDataDir%\license.key"
 set "powershellExe=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"  :: Define PowerShell executable path
+set "envFile=%~dp0%.env"
+set "appDataEnvFile=%appDataDir%\.env"
 
+@REM todo: uncomment
 :: Check if script is running as Administrator
-NET SESSION >nul 2>&1
-if %errorlevel% NEQ 0 (
-    echo ========================================
-    echo This script requires Administrator privileges.
-    echo ========================================
-    echo Restarting with Administrator privileges...
-    powershell -Command "Start-Process '%~dp0%setup_startup.bat' -Verb RunAs"
-    exit /b
-)
+@REM NET SESSION >nul 2>&1
+@REM if %errorlevel% NEQ 0 (
+@REM     echo ========================================
+@REM     echo This script requires Administrator privileges.
+@REM     echo ========================================
+@REM     echo Restarting with Administrator privileges...
+@REM     powershell -Command "Start-Process '%~dp0%setup_startup.bat' -Verb RunAs"
+@REM     exit /b
+@REM )
 
-:: Prompt for License Key
-echo ========================================
-echo Please enter your license key to continue.
-echo ========================================
-set /p licenseKey=Enter license key: 
-
-:: Validate license key (basic example: check if it's not empty)
-if "%licenseKey%"=="" (
-    echo ========================================
-    echo ERROR: License key cannot be empty.
-    echo ========================================
-    exit /b
-)
 
 :: Store License Key in AppData (hidden file)
 echo ========================================
-echo Storing license key securely...
+echo Storing app config...
 echo ========================================
+
 if not exist "%appDataDir%" (
     mkdir "%appDataDir%"
 )
 
-echo %licenseKey% > "%licenseFile%"
+@echo off
+setlocal enabledelayedexpansion
 
+:: Check if .env file exists in the current directory
+set "shouldPromtForVariables=false"
+if exist "%envFile%" (
+    echo "Found .env file in ./"
+    for /f "tokens=1,2 delims==" %%i in (%envFile%) do (
+        set "%%i=%%j"
+    )
 
+    @REM not working properly
+    if defined MACHINE_ID if defined DWAGENT_USER if defined DWAGENT_PASS if defined LICENCESE_KEY (
+        echo .env complete going to copy it
+        copy "%envFile%" "%appDataEnvFile%"
+        echo .env file copied to %appDataEnvFile%
+    ) else (
+        echo Found incomplete .env file in ./ thus promting for config vars
+        set "shouldPromtForVariables=true"
+    )
+) else (
+    echo No .env file in ./ thus promting for config vars
+    set "shouldPromtForVariables=true"
+)
+
+if "%shouldPromtForVariables%" == "true" (
+    set /p MACHINE_ID="Enter MACHINE_ID: "
+    set /p DWAGENT_USER="Enter DWAGENT_USER: "
+    set /p DWAGENT_PASS="Enter DWAGENT_PASS: "
+    set /p LICENCESE_KEY="Enter LICENCESE_KEY: "
+    (
+        echo MACHINE_ID=!MACHINE_ID!
+        echo DWAGENT_USER=!DWAGENT_USER!
+        echo DWAGENT_PASS=!DWAGENT_PASS!
+        echo LICENCESE_KEY=!LICENCESE_KEY!
+    ) > "%appDataEnvFile%"
+    echo .env file created at %appDataEnvFile%
+)
+
+@REM todo: remove
+exit 0
 :: Ensure Program Files directory exists
 echo ========================================
 echo Ensuring that the target directory exists...
@@ -103,7 +132,6 @@ if %errorlevel% neq 0 (
     echo A reboot has been scheduled at midnight.
 )
 echo ========================================
-
 
 :: Final Confirmation and Reboot Prompt
 echo ========================================
