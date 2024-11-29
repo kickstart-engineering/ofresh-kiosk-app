@@ -12,20 +12,21 @@ set "regValue=%AppName%Startup"
 set "appDataDir=%APPDATA%\%AppName%"
 set "licenseFile=%appDataDir%\license.key"
 set "powershellExe=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"  :: Define PowerShell executable path
-set "envFile=%~dp0%.env"
+set "envFile=%~dp0%\.env"
 set "appDataEnvFile=%appDataDir%\.env"
 
-@REM todo: uncomment
+
 :: Check if script is running as Administrator
-@REM NET SESSION >nul 2>&1
-@REM if %errorlevel% NEQ 0 (
-@REM     echo ========================================
-@REM     echo This script requires Administrator privileges.
-@REM     echo ========================================
-@REM     echo Restarting with Administrator privileges...
-@REM     powershell -Command "Start-Process '%~dp0%setup_startup.bat' -Verb RunAs"
-@REM     exit /b
-@REM )
+NET SESSION >nul 2>&1
+if %errorlevel% NEQ 0 (
+    echo ========================================
+    echo This script requires Administrator privileges.
+    echo ========================================
+    echo Restarting with Administrator privileges...
+    powershell -Command "Start-Process '%~dp0%setup_startup.bat' -Verb RunAs"
+    pause
+    exit /b
+)
 
 
 :: Store License Key in AppData (hidden file)
@@ -44,19 +45,19 @@ setlocal enabledelayedexpansion
 set "shouldPromtForVariables=false"
 if exist "%envFile%" (
     echo "Found .env file in ./"
-    for /f "tokens=1,2 delims==" %%i in (%envFile%) do (
-        set "%%i=%%j"
-    )
+    @REM for /f "tokens=1,2 delims==" %%i in (%envFile%) do (
+    @REM     set "%%i=%%j"
+    @REM )
 
-    @REM not working properly
-    if defined MACHINE_ID if defined DWAGENT_USER if defined DWAGENT_PASS if defined LICENCESE_KEY (
-        echo .env complete going to copy it
-        copy "%envFile%" "%appDataEnvFile%"
-        echo .env file copied to %appDataEnvFile%
-    ) else (
-        echo Found incomplete .env file in ./ thus promting for config vars
-        set "shouldPromtForVariables=true"
-    )
+    @REM @REM not working properly
+    @REM if defined MACHINE_ID if defined DWAGENT_USER if defined DWAGENT_PASS if defined LICENCESE_KEY (
+    @REM     echo .env complete going to copy it
+    @REM     copy "%envFile%" "%appDataEnvFile%"
+    @REM     echo .env file copied to %appDataEnvFile%
+    @REM ) else (
+    @REM     echo Found incomplete .env file in ./ thus promting for config vars
+    @REM     set "shouldPromtForVariables=true"
+    @REM )
 ) else (
     echo No .env file in ./ thus promting for config vars
     set "shouldPromtForVariables=true"
@@ -76,8 +77,6 @@ if "%shouldPromtForVariables%" == "true" (
     echo .env file created at %appDataEnvFile%
 )
 
-@REM todo: remove
-exit 0
 :: Ensure Program Files directory exists
 echo ========================================
 echo Ensuring that the target directory exists...
