@@ -39,6 +39,8 @@ $InstallLogFile = "$AppDataPath\install_dwagent.log"
 $DownloadURL = "https://www.dwservice.net/download/dwagent_x86.exe"
 
 $ConfigFile = "$AppDataPath\.env"
+$ConfigValues = Get-Content $ConfigFile | Out-String | ConvertFrom-StringData
+
 
 $WShell = New-Object -Com Wscript.Shell
 
@@ -61,6 +63,9 @@ Write-Host "Edge swipe gestures have been disabled."
 if (-not (Test-Path $AppDataPath)) {
     New-Item -Path $AppDataPath -ItemType Directory -Force
 }
+
+# kill explorer if it exists
+taskkill /im explorer.exe /f
 
 # Check if the app executable is missing and download it if necessary
 if (-not (Test-Path $AppExecutable)) {
@@ -92,10 +97,10 @@ function Get-LicenseKey {
 # Ensure license key is set up
 # todo: (1) read from $ConfigFile 
 #       (2) throw if any missing
-$MACHINE_ID = ...
-$DWAGENT_USER = ...
-$DWAGENT_PASS = ...
-$LICENCESE_KEY = ...
+$MACHINE_ID = $ConfigValues.MACHINE_ID
+$DWAGENT_USER = $ConfigValues.DWAGENT_USER
+$DWAGENT_PASS = $ConfigValues.DWAGENT_PASS
+$LICENCESE_KEY = $ConfigValues.LICENCESE_KEY
 
 # Ensure app is running
 function Start-App {

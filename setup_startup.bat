@@ -87,6 +87,22 @@ if not exist "%targetDir%" (
     mkdir "%targetDir%"
 )
 
+
+::set background to file on desktop named "wallpaper.bmp"
+echo Setting wallpaper
+reg add "HKCU\Control Panel\Desktop" /v Wallpaper /f /t REG_SZ /d %windir%\Desktop\wallpaper.bmp
+reg add "HKCU\Control Panel\Desktop" /v WallpaperStyle /f /t REG_SZ /d 10
+
+::set to sleepless
+powercfg /change standby-timeout-ac 0
+powercfg /change standby-timeout-dc 0
+powercfg /change monitor-timeout-ac 0
+powercfg /change monitor-timeout-dc 0
+powercfg /change hibernate-timeout-ac 0
+powercfg /change hibernate-timeout-dc 0
+
+:: %SystemRoot%\System32\RUNDLL32.EXE user32.dll, UpdatePerUserSystemParameters
+
 :: Copy PowerShell script and batch script to Program Files
 echo ========================================
 echo Copying PowerShell script and batch file to %targetDir%...
