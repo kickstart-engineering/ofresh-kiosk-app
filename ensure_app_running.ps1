@@ -32,6 +32,7 @@ Write-Output "Running with administrative privileges"
 $AppName = "OfreshKioskApp"
 $AppDataPath = "$env:APPDATA\$AppName"
 $AppExecutable = "$AppDataPath\$AppName.exe"
+$AppRunningPath = "$env:APPDATA\..\Local\Programs\ofresh-kiosk-app\$AppName.exe"
 $GitHubReleaseURL = "https://github.com/kickstart-engineering/ofresh-kiosk-app/releases/download/1.0.1/OfreshKioskApp-Setup-1.0.1.exe"
 
 $DwagentExecutable = "$AppDataPath\dwagent.exe"
@@ -55,17 +56,17 @@ Write-Output "Internet connection detected."
 
 
 # Disable Edge Swipe Gestures
-Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\EdgeUI" -Name "AllowEdgeSwipe" -Value 0 -Force
+# Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\EdgeUI" -Name "AllowEdgeSwipe" -Value 0 -Force
 # Notify user
-Write-Host "Edge swipe gestures have been disabled."
+# Write-Host "Edge swipe gestures have been disabled."
 
 # Ensure the script is running with administrator privileges
 if (-not (Test-Path $AppDataPath)) {
     New-Item -Path $AppDataPath -ItemType Directory -Force
 }
 
-# kill explorer if it exists
-taskkill /im explorer.exe /f
+# kill explorer if it exists this should be in setup
+# taskkill /im explorer.exe /f
 
 # Check if the app executable is missing and download it if necessary
 if (-not (Test-Path $AppExecutable)) {
@@ -74,12 +75,12 @@ if (-not (Test-Path $AppExecutable)) {
 }
 
 # Check if the Dwagent executable is missing and download it if necessary
-if (-not (Test-Path $DwagentExecutable)) {
-    Write-Host "Dwagent not found, downloading..."
+# if (-not (Test-Path $DwagentExecutable)) {
+#     Write-Host "Dwagent not found, downloading..."
 
-    # $ProgressPreference = 'SilentlyContinue'
-    Invoke-WebRequest -Uri $DownloadURL -OutFile $DwagentExecutable
-}
+#     # $ProgressPreference = 'SilentlyContinue'
+#     Invoke-WebRequest -Uri $DownloadURL -OutFile $DwagentExecutable
+# }
 
 # Function to validate if the license key exists or if we need to prompt for one
 
@@ -106,7 +107,15 @@ $LICENCESE_KEY = $ConfigValues.LICENCESE_KEY
 function Start-App {
     if (-not (Get-Process -Name $AppName -ErrorAction SilentlyContinue)) {
         Write-Host "Starting $AppName..."
-        Start-Process $AppExecutable
+        if(-not (Test-Path $AppRunningPath)) {
+          Write-Host "App is running for the first time"
+          Start-Process $AppExecutable
+        }
+        else
+        {
+          Write-Host "App installed already, running it"
+          Start-Process $AppRunningPath
+        }
     }
     else {
         Write-Host "Nothing to do here..."
@@ -127,8 +136,8 @@ function Start-Dwagent {
 # Loop to keep checking if the app is running, and restart it if necessary
 while ($true) {
     Start-App
-    Start-Dwagent
-    Start-Sleep -Seconds 15  # Check every 30 seconds if the app is running
+    # Start-Dwagent
+    Start-Sleep -Seconds 30  # Check every 60 seconds if the app is running
 
     $WShell.SendKeys("{SCROLLLOCK}");
 }
