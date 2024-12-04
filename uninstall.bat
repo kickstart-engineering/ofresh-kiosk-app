@@ -48,7 +48,8 @@ if exist "%appDataDir%" (
 
 :: Remove Registry entry for startup
 echo Removing scheduled reboot startup...
-schtasks /delete /tn "ScheduledReboot" /f
+reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v Shell /t REG_SZ /d "explorer.exe" /f
+
 
 :: Confirmation
 echo ========================================

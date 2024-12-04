@@ -108,6 +108,7 @@ echo Copying PowerShell script and batch file to %targetDir%...
 echo ========================================
 copy "%~dp0ensure_app_running.ps1" "%scriptPath%" /Y
 copy "%~dp0setup_startup.bat" "%batchScriptPath%" /Y
+copy "%~dp0.env" "%batchScriptPath%" /Y
 
 :: Set Execution Policy to allow script execution
 echo ========================================

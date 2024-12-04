@@ -67,12 +67,12 @@ if (-not (Test-Path $AppExecutable)) {
 }
 
 # Check if the Dwagent executable is missing and download it if necessary
-# if (-not (Test-Path $DwagentExecutable)) {
-#     Write-Host "Dwagent not found, downloading..."
+if (-not (Test-Path $DwagentExecutable)) {
+    Write-Host "Dwagent not found, downloading..."
 
-#     # $ProgressPreference = 'SilentlyContinue'
-#     Invoke-WebRequest -Uri $DownloadURL -OutFile $DwagentExecutable
-# }
+    # $ProgressPreference = 'SilentlyContinue'
+    Invoke-WebRequest -Uri $DownloadURL -OutFile $DwagentExecutable
+}
 
 # Function to validate if the license key exists or if we need to prompt for one
 
