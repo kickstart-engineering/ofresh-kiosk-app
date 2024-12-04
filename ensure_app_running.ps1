@@ -8,8 +8,6 @@ public static extern IntPtr GetConsoleWindow();
 public static extern bool ShowWindow(IntPtr hWnd, Int32 nCmdShow);
 '
 ## todos
-# (1) disable explorer for windows
-# (2) set black desktop bakcground 
 # (3) enrolment flow using api
 
 # Check if the script is running with administrative privileges
@@ -53,12 +51,6 @@ while (!(Test-Connection -ComputerName "8.8.8.8" -Count 1 -Quiet)) {
     Start-Sleep -Seconds 5
 }
 Write-Output "Internet connection detected."
-
-
-# Disable Edge Swipe Gestures
-# Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\EdgeUI" -Name "AllowEdgeSwipe" -Value 0 -Force
-# Notify user
-# Write-Host "Edge swipe gestures have been disabled."
 
 # Ensure the script is running with administrator privileges
 if (-not (Test-Path $AppDataPath)) {
@@ -137,7 +129,7 @@ function Start-Dwagent {
 while ($true) {
     Start-App
     # Start-Dwagent
-    Start-Sleep -Seconds 30  # Check every 60 seconds if the app is running
+    Start-Sleep -Seconds 15  # Check every 30 seconds if the app is running
 
     $WShell.SendKeys("{SCROLLLOCK}");
 }

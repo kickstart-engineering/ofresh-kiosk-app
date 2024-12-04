@@ -11,7 +11,7 @@ set "regKey=HKCU\Software\Microsoft\Windows\CurrentVersion\Run"
 set "regValue=%AppName%Startup"
 set "appDataDir=%APPDATA%\%AppName%"
 set "licenseFile=%appDataDir%\license.key"
-set "powershellExe=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"  :: Define PowerShell executable path
+set "powershellExe=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell"  :: Define PowerShell executable path
 set "envFile=%~dp0%\.env"
 set "appDataEnvFile=%appDataDir%\.env"
 
@@ -63,19 +63,19 @@ if exist "%envFile%" (
     set "shouldPromtForVariables=true"
 )
 
-if "%shouldPromtForVariables%" == "true" (
-    set /p MACHINE_ID="Enter MACHINE_ID: "
-    set /p DWAGENT_USER="Enter DWAGENT_USER: "
-    set /p DWAGENT_PASS="Enter DWAGENT_PASS: "
-    set /p LICENCESE_KEY="Enter LICENCESE_KEY: "
-    (
-        echo MACHINE_ID=!MACHINE_ID!
-        echo DWAGENT_USER=!DWAGENT_USER!
-        echo DWAGENT_PASS=!DWAGENT_PASS!
-        echo LICENCESE_KEY=!LICENCESE_KEY!
-    ) > "%appDataEnvFile%"
-    echo .env file created at %appDataEnvFile%
-)
+@REM if "%shouldPromtForVariables%" == "true" (
+@REM     set /p MACHINE_ID="Enter MACHINE_ID: "
+@REM     set /p DWAGENT_USER="Enter DWAGENT_USER: "
+@REM     set /p DWAGENT_PASS="Enter DWAGENT_PASS: "
+@REM     set /p LICENCESE_KEY="Enter LICENCESE_KEY: "
+@REM     (
+@REM         echo MACHINE_ID=!MACHINE_ID!
+@REM         echo DWAGENT_USER=!DWAGENT_USER!
+@REM         echo DWAGENT_PASS=!DWAGENT_PASS!
+@REM         echo LICENCESE_KEY=!LICENCESE_KEY!
+@REM     ) > "%appDataEnvFile%"
+@REM     echo .env file created at %appDataEnvFile%
+@REM )
 
 :: Ensure Program Files directory exists
 echo ========================================
@@ -88,9 +88,9 @@ if not exist "%targetDir%" (
 
 
 ::set background to file on desktop named "wallpaper.bmp"
-echo Setting wallpaper
-reg add "HKCU\Control Panel\Desktop" /v Wallpaper /f /t REG_SZ /d %windir%\Desktop\wallpaper.bmp
-reg add "HKCU\Control Panel\Desktop" /v WallpaperStyle /f /t REG_SZ /d 10
+@REM echo Setting wallpaper
+@REM reg add "HKCU\Control Panel\Desktop" /v Wallpaper /f /t REG_SZ /d %windir%\Desktop\wallpaper.bmp
+@REM reg add "HKCU\Control Panel\Desktop" /v WallpaperStyle /f /t REG_SZ /d 10
 
 ::set to sleepless
 powercfg /change standby-timeout-ac 0
@@ -116,20 +116,20 @@ echo ========================================
 powershell.exe -Command "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine -Force"
 
 :: Create a Task Scheduler task to run at startup
-echo ========================================
-echo Creating Task Scheduler entry to run script at startup...
-echo ========================================
-schtasks /create /tn "%taskName%" ^
-    /tr "%powershellExe% -ExecutionPolicy Bypass -File \"%scriptPath%\"" ^
-    /sc onstart ^
-    /ru "SYSTEM" ^
-    /f
+@REM echo ========================================
+@REM echo Creating Task Scheduler entry to run script at startup...
+@REM echo ========================================
+@REM schtasks /create /tn "%taskName%" ^
+@REM     /tr "%powershellExe% -ExecutionPolicy Bypass -File \"%scriptPath%\"" ^
+@REM     /sc onstart ^
+@REM     /ru "SYSTEM" ^
+@REM     /f
 
 :: Optionally add the script to startup via the registry (fallback)
-echo ========================================
-echo Optionally adding registry entry for startup...
-echo ========================================
-reg add "%regKey%" /v "%regValue%" /t REG_SZ /d "\"%powershellExe%\" -ExecutionPolicy Bypass -File \"%scriptPath%\"" /f
+@REM echo ========================================
+@REM echo Optionally adding registry entry for startup...
+@REM echo ========================================
+@REM reg add "%regKey%" /v "%regValue%" /t REG_SZ /d "\"%powershellExe%\" -ExecutionPolicy Bypass -File \"%scriptPath%\"" /f
 
 
 :: Disable Edge Swipe Gestures
@@ -147,6 +147,9 @@ if %errorlevel% neq 0 (
     echo A reboot has been scheduled at midnight.
 )
 echo ========================================
+
+:: replace explorer.exe with ensure_app_running.ps1 from the start directory
+reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v Shell /t REG_SZ /d "\"%powershellExe%\" -ExecutionPolicy Bypass -File \"%scriptPath%\"" /f
 
 :: Final Confirmation and Reboot Prompt
 echo ========================================
