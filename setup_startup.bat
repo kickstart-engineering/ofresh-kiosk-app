@@ -1,20 +1,26 @@
 @echo off
+setlocal enabledelayedexpansion
 setlocal
 
 :: Define the application name and directories
-set "AppName=OfreshKioskApp"  :: Change this variable to your application name
+set AppName=OfreshKioskApp
 set "targetDir=C:\Program Files\%AppName%"
 set "scriptPath=%targetDir%\ensure_app_running.ps1"
-set "batchScriptPath=%targetDir%\setup_startup.bat"
-set "taskName=Ensure%AppName%Running"
-set "regKey=HKCU\Software\Microsoft\Windows\CurrentVersion\Run"
-set "regValue=%AppName%Startup"
-set "appDataDir=%APPDATA%\%AppName%"
-set "licenseFile=%appDataDir%\license.key"
-set "powershellExe=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell"  :: Define PowerShell executable path
-set "envFile=%~dp0%\.env"
-set "appDataEnvFile=%appDataDir%\.env"
+set AppRunningPath=%APPDATA%\..\Local\Programs\ofresh-kiosk-app\%AppName%.exe
 
+@REM  app
+set AppDataPath=%APPDATA%\%AppName%
+set AppExecutable=%AppDataPath%\%AppName%.exe
+set GitHubReleaseURL=https://github.com/kickstart-engineering/ofresh-kiosk-app/releases/download/1.0.1/OfreshKioskApp-Setup-1.0.1.exe
+
+set powershellExe=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell
+set ConfigFile=%~dp0%.env
+
+@REM Dwagent
+set DwagentExecutable=C:\Program Files\DWAgent\native\dwaglnc.exe
+set DwagentDownloadPath=%~dp0%dwagent.exe
+set DwagentLogPath=%~dp0%install_dwagent.log
+set DownloadURL=https://www.dwservice.net/download/dwagent_x86.exe
 
 :: Check if script is running as Administrator
 NET SESSION >nul 2>&1
@@ -24,75 +30,108 @@ if %errorlevel% NEQ 0 (
     echo ========================================
     echo Restarting with Administrator privileges...
     powershell -Command "Start-Process '%~dp0%setup_startup.bat' -Verb RunAs"
-    pause
     exit /b
 )
 
+::choose type of setup
+echo ========================================
+echo Preparing types of setup...
+echo ========================================
+echo For resetting the explorer for boot up, type 1
+echo For setting the registers, type 2
+echo For installing the app, type 3
+echo For installing dwagent, type 4
+echo For full install, type 5
+echo Timeout or type 6
+
+choice /c 123456 /t 5 /d 6 >nul
+
+set _e=%ERRORLEVEL%
+
+if "%_e%"==1 (
+  echo ========================================
+  echo Set explorer to be used at boot up
+  echo ========================================
+  reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v Shell /t REG_SZ /d "explorer.exe" /f
+  pause
+  exit /b
+)
+
+if "%_e%"==2 || "%_e%"==5 (
+  echo ========================================
+  echo Setting up bootup with PowerShell script instead of explorer
+  echo ========================================
+  echo Copy PowerShell script to %targetDir%
+  if not exist "%targetDir%" (
+    echo Creating directory: %targetDir%
+    mkdir "%targetDir%"
+  )
+  copy "%~dp0ensure_app_running.ps1" "%scriptPath%" /Y
+
+  echo Ensuring that PowerShell script execution is allowed...
+  powershell.exe -Command "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine -Force"
+  
+  echo RegEdit Boot up using the script
+  reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v Shell /t REG_SZ /d "\"%powershellExe%\" -ExecutionPolicy Bypass -File \"%scriptPath%\"" /f
+)
+
+if "%_e%"==3 || "%_e%"==5 (
+  echo ========================================
+  echo Install App
+  echo ========================================
+  if not exist %AppExecutable% (
+    echo App not found, downloading...
+    powershell -Command "Invoke-WebRequest -Uri '%GitHubReleaseURL%' -OutFile '%AppExecutable%'"
+  )
+  if not exist "%AppRunningPath%" (
+    echo App is running first install
+    %AppExecutable%
+  )
+  else
+  (
+    echo App is already installed
+  )
+)
+
+if "%_e%"==4 || "%_e%"==5 (
+  echo ========================================
+  echo Dwagent setup
+  echo ========================================
+  @REM if not installed, check if dld
+  if not exist "%DwagentExecutable%" (
+    echo Dwagent not found in path '%DwagentExecutable%', looking for dld file in '%DwagentDownloadPath%'
+    if not exist "%DwagentDownloadPath%" (
+      echo Dwagent downloading...
+      powershell -Command "Invoke-WebRequest -Uri '%DownloadURL%' -OutFile '%DwagentDownloadPath%'"
+    )
+    echo Dwagent downloaded, running installation
+    @REM get .env vars
+    for /f "tokens=1,2 delims==" %%A in (%ConfigFile%) do (
+      if "%%A"=="MACHINE_ID" set %%A=%%B
+      if "%%A"=="DWAGENT_USER" set %%A=%%B
+      if "%%A"=="DWAGENT_PASS" set %%A=%%B
+    )
+    echo command uses -silent user=!DWAGENT_USER! password=!DWAGENT_PASS! name=!MACHINE_ID! logpath=!DwagentLogPath!
+    %DwagentDownloadPath% -silent user=!DWAGENT_USER! password=!DWAGENT_PASS! name=!MACHINE_ID! logpath=!DwagentLogPath!
+  )
+  echo Dwagent is set up
+)
+
+if "%_e%"!=5 exit /b
 
 :: Store License Key in AppData (hidden file)
 echo ========================================
 echo Storing app config...
 echo ========================================
-
-if not exist "%appDataDir%" (
-    mkdir "%appDataDir%"
+if not exist "%AppDataPath%" (
+    mkdir "%AppDataPath%"
 )
 
-@echo off
-setlocal enabledelayedexpansion
-
-:: Check if .env file exists in the current directory
-set "shouldPromtForVariables=false"
-if exist "%envFile%" (
-    echo "Found .env file in ./"
-    @REM for /f "tokens=1,2 delims==" %%i in (%envFile%) do (
-    @REM     set "%%i=%%j"
-    @REM )
-
-    @REM @REM not working properly
-    @REM if defined MACHINE_ID if defined DWAGENT_USER if defined DWAGENT_PASS if defined LICENCESE_KEY (
-    @REM     echo .env complete going to copy it
-    @REM     copy "%envFile%" "%appDataEnvFile%"
-    @REM     echo .env file copied to %appDataEnvFile%
-    @REM ) else (
-    @REM     echo Found incomplete .env file in ./ thus promting for config vars
-    @REM     set "shouldPromtForVariables=true"
-    @REM )
-) else (
-    echo No .env file in ./ thus promting for config vars
-    set "shouldPromtForVariables=true"
-)
-
-@REM if "%shouldPromtForVariables%" == "true" (
-@REM     set /p MACHINE_ID="Enter MACHINE_ID: "
-@REM     set /p DWAGENT_USER="Enter DWAGENT_USER: "
-@REM     set /p DWAGENT_PASS="Enter DWAGENT_PASS: "
-@REM     set /p LICENCESE_KEY="Enter LICENCESE_KEY: "
-@REM     (
-@REM         echo MACHINE_ID=!MACHINE_ID!
-@REM         echo DWAGENT_USER=!DWAGENT_USER!
-@REM         echo DWAGENT_PASS=!DWAGENT_PASS!
-@REM         echo LICENCESE_KEY=!LICENCESE_KEY!
-@REM     ) > "%appDataEnvFile%"
-@REM     echo .env file created at %appDataEnvFile%
-@REM )
-
-:: Ensure Program Files directory exists
-echo ========================================
-echo Ensuring that the target directory exists...
-echo ========================================
-if not exist "%targetDir%" (
-    echo Creating directory: %targetDir%
-    mkdir "%targetDir%"
-)
-
-
-::set background to file on desktop named "wallpaper.bmp"
-@REM echo Setting wallpaper
-@REM reg add "HKCU\Control Panel\Desktop" /v Wallpaper /f /t REG_SZ /d %windir%\Desktop\wallpaper.bmp
-@REM reg add "HKCU\Control Panel\Desktop" /v WallpaperStyle /f /t REG_SZ /d 10
 
 ::set to sleepless
+echo ========================================
+echo Setting sleepless...
+echo ========================================
 powercfg /change standby-timeout-ac 0
 powercfg /change standby-timeout-dc 0
 powercfg /change monitor-timeout-ac 0
@@ -100,57 +139,14 @@ powercfg /change monitor-timeout-dc 0
 powercfg /change hibernate-timeout-ac 0
 powercfg /change hibernate-timeout-dc 0
 
-:: %SystemRoot%\System32\RUNDLL32.EXE user32.dll, UpdatePerUserSystemParameters
-
-:: Copy PowerShell script and batch script to Program Files
-echo ========================================
-echo Copying PowerShell script and batch file to %targetDir%...
-echo ========================================
-copy "%~dp0ensure_app_running.ps1" "%scriptPath%" /Y
-copy "%~dp0setup_startup.bat" "%batchScriptPath%" /Y
-copy "%~dp0.env" "%batchScriptPath%" /Y
-
-:: Set Execution Policy to allow script execution
-echo ========================================
-echo Ensuring that PowerShell script execution is allowed...
-echo ========================================
-powershell.exe -Command "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine -Force"
-
-:: Create a Task Scheduler task to run at startup
-@REM echo ========================================
-@REM echo Creating Task Scheduler entry to run script at startup...
-@REM echo ========================================
-@REM schtasks /create /tn "%taskName%" ^
-@REM     /tr "%powershellExe% -ExecutionPolicy Bypass -File \"%scriptPath%\"" ^
-@REM     /sc onstart ^
-@REM     /ru "SYSTEM" ^
-@REM     /f
-
-:: Optionally add the script to startup via the registry (fallback)
-@REM echo ========================================
-@REM echo Optionally adding registry entry for startup...
-@REM echo ========================================
-@REM reg add "%regKey%" /v "%regValue%" /t REG_SZ /d "\"%powershellExe%\" -ExecutionPolicy Bypass -File \"%scriptPath%\"" /f
-
 
 :: Disable Edge Swipe Gestures
 echo ========================================
-echo Edge swipe gestures have been disabled
+echo Other RegEdit settings
 echo ========================================
+echo Edge swipe gestures have been disabled
 reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\EdgeUI" /v AllowEdgeSwipe /t REG_DWORD /d 0 /f
 
-:: Schedule a reboot at midnight
-schtasks /create /tn "ScheduledReboot" /tr "shutdown /r /f" /sc once /st 00:00 /f
-echo ========================================
-if %errorlevel% neq 0 (
-    echo Failed to schedule the reboot. Ensure Task Scheduler service is running.
-) else (
-    echo A reboot has been scheduled at midnight.
-)
-echo ========================================
-
-:: replace explorer.exe with ensure_app_running.ps1 from the start directory
-reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v Shell /t REG_SZ /d "\"%powershellExe%\" -ExecutionPolicy Bypass -File \"%scriptPath%\"" /f
 
 :: Final Confirmation and Reboot Prompt
 echo ========================================

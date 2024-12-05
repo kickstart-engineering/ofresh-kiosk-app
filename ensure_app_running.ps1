@@ -33,10 +33,6 @@ $AppExecutable = "$AppDataPath\$AppName.exe"
 $AppRunningPath = "$env:APPDATA\..\Local\Programs\ofresh-kiosk-app\$AppName.exe"
 $GitHubReleaseURL = "https://github.com/kickstart-engineering/ofresh-kiosk-app/releases/download/1.0.1/OfreshKioskApp-Setup-1.0.1.exe"
 
-$DwagentExecutable = "$AppDataPath\dwagent.exe"
-$InstallLogFile = "$AppDataPath\install_dwagent.log"
-$DownloadURL = "https://www.dwservice.net/download/dwagent_x86.exe"
-
 $ConfigFile = "$AppDataPath\.env"
 $ConfigValues = Get-Content $ConfigFile | Out-String | ConvertFrom-StringData
 
@@ -57,25 +53,15 @@ if (-not (Test-Path $AppDataPath)) {
     New-Item -Path $AppDataPath -ItemType Directory -Force
 }
 
-# kill explorer if it exists this should be in setup
-# taskkill /im explorer.exe /f
-
 # Check if the app executable is missing and download it if necessary
 if (-not (Test-Path $AppExecutable)) {
     Write-Host "App not found, downloading..."
     Invoke-WebRequest -Uri $GitHubReleaseURL -OutFile $AppExecutable
 }
 
-# Check if the Dwagent executable is missing and download it if necessary
-if (-not (Test-Path $DwagentExecutable)) {
-    Write-Host "Dwagent not found, downloading..."
 
-    # $ProgressPreference = 'SilentlyContinue'
-    Invoke-WebRequest -Uri $DownloadURL -OutFile $DwagentExecutable
-}
 
 # Function to validate if the license key exists or if we need to prompt for one
-
 function Get-LicenseKey {
     if (Test-Path $LicenseKeyFile) {
         return Get-Content $LicenseKeyFile
@@ -90,10 +76,10 @@ function Get-LicenseKey {
 # Ensure license key is set up
 # todo: (1) read from $ConfigFile 
 #       (2) throw if any missing
-$MACHINE_ID = $ConfigValues.MACHINE_ID
-$DWAGENT_USER = $ConfigValues.DWAGENT_USER
-$DWAGENT_PASS = $ConfigValues.DWAGENT_PASS
-$LICENCESE_KEY = $ConfigValues.LICENCESE_KEY
+# $MACHINE_ID = $ConfigValues.MACHINE_ID
+# $DWAGENT_USER = $ConfigValues.DWAGENT_USER
+# $DWAGENT_PASS = $ConfigValues.DWAGENT_PASS
+# $LICENCESE_KEY = $ConfigValues.LICENCESE_KEY
 
 # Ensure app is running
 function Start-App {
@@ -114,21 +100,10 @@ function Start-App {
     }
 }
 
-# Ensure app is running
-function Start-Dwagent {
-    if (-not (Get-Process -Name dwagent -ErrorAction SilentlyContinue)) {
-        Write-Host "Starting dwagent..."
-        Start-Process $DwagentExecutable -ArgumentList "-silent user=$DWAGENT_USER password=$DWAGENT_PASS name=$MACHINE_ID logpath=$InstallLogFile"
-    }
-    else {
-        Write-Host "Nothing to do here..."
-    }
-}
 
 # Loop to keep checking if the app is running, and restart it if necessary
 while ($true) {
     Start-App
-    # Start-Dwagent
     Start-Sleep -Seconds 15  # Check every 30 seconds if the app is running
 
     $WShell.SendKeys("{SCROLLLOCK}");
