@@ -48,7 +48,7 @@ choice /c 123456 /t 5 /d 6 >nul
 
 set _e=%ERRORLEVEL%
 
-if "%_e%"==1 (
+if %_e%==1 (
   echo ========================================
   echo Set explorer to be used at boot up
   echo ========================================
@@ -57,7 +57,10 @@ if "%_e%"==1 (
   exit /b
 )
 
-if "%_e%"==2 || "%_e%"==5 (
+set cond=0
+if %_e%==2 cond=1
+if %_e%==5 cond=1
+if %cond%==1 (
   echo ========================================
   echo Setting up bootup with PowerShell script instead of explorer
   echo ========================================
@@ -74,8 +77,10 @@ if "%_e%"==2 || "%_e%"==5 (
   echo RegEdit Boot up using the script
   reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v Shell /t REG_SZ /d "\"%powershellExe%\" -ExecutionPolicy Bypass -File \"%scriptPath%\"" /f
 )
-
-if "%_e%"==3 || "%_e%"==5 (
+set cond=0
+if %_e%==3 cond=1
+if %_e%==5 cond=1
+if %cond%==1 (
   echo ========================================
   echo Install App
   echo ========================================
@@ -93,7 +98,10 @@ if "%_e%"==3 || "%_e%"==5 (
   )
 )
 
-if "%_e%"==4 || "%_e%"==5 (
+set cond=0
+if %_e%==4 cond=1
+if %_e%==5 cond=1
+if %cond%==1 (
   echo ========================================
   echo Dwagent setup
   echo ========================================
@@ -117,8 +125,10 @@ if "%_e%"==4 || "%_e%"==5 (
   echo Dwagent is set up
 )
 
-if "%_e%"!=5 exit /b
-
+if not %_e%==5 (
+  echo Thank you for installing OFresh
+  exit /b
+)
 :: Store License Key in AppData (hidden file)
 echo ========================================
 echo Storing app config...
