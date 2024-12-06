@@ -156,6 +156,9 @@ echo Other RegEdit settings
 echo ========================================
 echo Edge swipe gestures have been disabled
 reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\EdgeUI" /v AllowEdgeSwipe /t REG_DWORD /d 0 /f
+echo Policy set to never ask for admin
+reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" /v EnableLUA /t REG_DWORD /d 0 /f
+echo to do: not allow on screen keyboard
 
 
 :: Final Confirmation and Reboot Prompt

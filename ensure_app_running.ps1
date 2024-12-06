@@ -39,14 +39,6 @@ $ConfigValues = Get-Content $ConfigFile | Out-String | ConvertFrom-StringData
 
 $WShell = New-Object -Com Wscript.Shell
 
-# Wait for an active internet connection
-Write-Output "Waiting for an active internet connection..."
-
-while (!(Test-Connection -ComputerName "8.8.8.8" -Count 1 -Quiet)) {
-    Write-Output "No internet connection detected. Retrying in 5 seconds..."
-    Start-Sleep -Seconds 5
-}
-Write-Output "Internet connection detected."
 
 # Ensure the script is running with administrator privileges
 if (-not (Test-Path $AppDataPath)) {
@@ -55,8 +47,17 @@ if (-not (Test-Path $AppDataPath)) {
 
 # Check if the app executable is missing and download it if necessary
 if (-not (Test-Path $AppExecutable)) {
-    Write-Host "App not found, downloading..."
-    Invoke-WebRequest -Uri $GitHubReleaseURL -OutFile $AppExecutable
+  Write-Host "App not found, downloading"
+  # Wait for an active internet connection
+  Write-Output "Waiting for an active internet connection..."
+
+  while (!(Test-Connection -ComputerName "8.8.8.8" -Count 1 -Quiet)) {
+      Write-Output "No internet connection detected. Retrying in 5 seconds..."
+      Start-Sleep -Seconds 5
+  }
+  Write-Output "Internet connection detected."
+  Write-Host "Downloading app..."
+  Invoke-WebRequest -Uri $GitHubReleaseURL -OutFile $AppExecutable
 }
 
 
