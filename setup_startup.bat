@@ -35,16 +35,16 @@ if %errorlevel% NEQ 0 (
 
 ::choose type of setup
 echo ========================================
-echo Preparing types of setup...
+echo Preparing setup: Please select an option
 echo ========================================
-echo For resetting the explorer for boot up, type 1
-echo For setting the registers, type 2
-echo For installing the app, type 3
-echo For installing dwagent, type 4
-echo For full install, type 5
-echo Timeout or type 6
+echo 1: resetting the explorer for boot up
+echo 2: setting the registers
+echo 3: installing the app
+echo 4: installing dwagent
+echo 5: full install
+echo >> 
 
-choice /c 123456 /t 5 /d 6 >nul
+choice /c 123456 /t 30 /d 6 >nul
 
 set _e=%ERRORLEVEL%
 
@@ -58,8 +58,8 @@ if %_e%==1 (
 )
 
 set cond=0
-if %_e%==2 cond=1
-if %_e%==5 cond=1
+if %_e%==2 set cond=1
+if %_e%==5 set cond=1
 if %cond%==1 (
   echo ========================================
   echo Setting up bootup with PowerShell script instead of explorer
@@ -78,8 +78,8 @@ if %cond%==1 (
   reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v Shell /t REG_SZ /d "\"%powershellExe%\" -ExecutionPolicy Bypass -File \"%scriptPath%\"" /f
 )
 set cond=0
-if %_e%==3 cond=1
-if %_e%==5 cond=1
+if %_e%==3 set cond=1
+if %_e%==5 set cond=1
 if %cond%==1 (
   echo ========================================
   echo Install App
@@ -92,15 +92,12 @@ if %cond%==1 (
     echo App is running first install
     %AppExecutable%
   )
-  else
-  (
-    echo App is already installed
-  )
+  echo App is installed
 )
 
 set cond=0
-if %_e%==4 cond=1
-if %_e%==5 cond=1
+if %_e%==4 set cond=1
+if %_e%==5 set cond=1
 if %cond%==1 (
   echo ========================================
   echo Dwagent setup
@@ -125,8 +122,17 @@ if %cond%==1 (
   echo Dwagent is set up
 )
 
+if %_e%==6 (
+  echo .
+  echo Exiting due tue timeout
+  pause
+  exit /b
+)
+
 if not %_e%==5 (
+  echo .
   echo Thank you for installing OFresh
+  pause
   exit /b
 )
 :: Store License Key in AppData (hidden file)
