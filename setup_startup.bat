@@ -42,7 +42,6 @@ echo 2: setting the registers
 echo 3: installing the app
 echo 4: installing dwagent
 echo 5: full install
-echo >> 
 
 choice /c 123456 /t 30 /d 6 >nul
 
