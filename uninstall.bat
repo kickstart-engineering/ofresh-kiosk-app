@@ -20,13 +20,18 @@ if %errorlevel% NEQ 0 (
     exit /b
 )
 
-:: Remove Task Scheduler entry
-echo Removing Task Scheduler entry: %taskName%...
-schtasks /delete /tn "%taskName%" /f
 
-:: Remove Registry entry for startup
-echo Removing registry entry for startup...
-reg delete "%regKey%" /v "%regValue%" /f
+:: Remove Registry entries
+echo ============================
+echo Removing Registry entries
+echo ============================
+echo Setting explorer for boot up
+reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v Shell /t REG_SZ /d "explorer.exe" /f
+echo Edge swipe gestures have been enabled
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\EdgeUI" /v AllowEdgeSwipe /t REG_DWORD /d 1 /f
+echo Policy set to ask for admin
+reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" /v EnableLUA /t REG_DWORD /d 1 /f 
+
 
 :: Remove files from Program Files
 echo Removing files from Program Files directory...
