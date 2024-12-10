@@ -33,9 +33,8 @@ $AppExecutable = "$AppDataPath\$AppName.exe"
 $AppRunningPath = "$env:APPDATA\..\Local\Programs\ofresh-kiosk-app\$AppName.exe"
 $GitHubReleaseURL = "https://github.com/kickstart-engineering/ofresh-kiosk-app/releases/download/1.0.1/OfreshKioskApp-Setup-1.0.1.exe"
 
-$ConfigFile = "$AppDataPath\.env"
-$ConfigValues = Get-Content $ConfigFile | Out-String | ConvertFrom-StringData
-
+# $ConfigFile = "$AppDataPath\.env"
+# $ConfigValues = Get-Content $ConfigFile | Out-String | ConvertFrom-StringData
 
 $WShell = New-Object -Com Wscript.Shell
 

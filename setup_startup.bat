@@ -85,6 +85,9 @@ if %cond%==1 (
   echo ========================================
   if not exist %AppExecutable% (
     echo App not found, downloading...
+    if not exist %AppDataPath% (
+      mkdir %AppDataPath%
+    )
     powershell -Command "Invoke-WebRequest -Uri '%GitHubReleaseURL%' -OutFile '%AppExecutable%'"
   )
   if not exist "%AppRunningPath%" (
