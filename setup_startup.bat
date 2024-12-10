@@ -76,26 +76,27 @@ if %cond%==1 (
   echo RegEdit Boot up using the script
   reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v Shell /t REG_SZ /d "\"%powershellExe%\" -ExecutionPolicy Bypass -File \"%scriptPath%\"" /f
 )
-set cond=0
-if %_e%==3 set cond=1
-if %_e%==5 set cond=1
-if %cond%==1 (
-  echo ========================================
-  echo Install App
-  echo ========================================
-  if not exist %AppExecutable% (
-    echo App not found, downloading...
-    if not exist %AppDataPath% (
-      mkdir %AppDataPath%
-    )
-    powershell -Command "Invoke-WebRequest -Uri '%GitHubReleaseURL%' -OutFile '%AppExecutable%'"
-  )
-  if not exist "%AppRunningPath%" (
-    echo App is running first install
-    %AppExecutable%
-  )
-  echo App is installed
-)
+
+@REM set cond=0
+@REM if %_e%==3 set cond=1
+@REM if %_e%==5 set cond=1
+@REM if %cond%==1 (
+@REM   echo ========================================
+@REM   echo Install App
+@REM   echo ========================================
+@REM   if not exist %AppExecutable% (
+@REM     echo App not found, downloading...
+@REM     if not exist %AppDataPath% (
+@REM       mkdir %AppDataPath%
+@REM     )
+@REM     powershell -Command "Invoke-WebRequest -Uri '%GitHubReleaseURL%' -OutFile '%AppExecutable%'"
+@REM   )
+@REM   if not exist "%AppRunningPath%" (
+@REM     echo App is running first install
+@REM     %AppExecutable%
+@REM   )
+@REM   echo App is installed
+@REM )
 
 set cond=0
 if %_e%==4 set cond=1
@@ -118,7 +119,8 @@ if %cond%==1 (
       if "%%A"=="DWAGENT_USER" set %%A=%%B
       if "%%A"=="DWAGENT_PASS" set %%A=%%B
     )
-    echo command uses -silent user=!DWAGENT_USER! password=!DWAGENT_PASS! name=!MACHINE_ID! logpath=!DwagentLogPath!
+    @REM echo command uses -silent user=!DWAGENT_USER! password=!DWAGENT_PASS! name=!MACHINE_ID! logpath=!DwagentLogPath!
+    echo installing DwAgent...
     %DwagentDownloadPath% -silent user=!DWAGENT_USER! password=!DWAGENT_PASS! name=!MACHINE_ID! logpath=!DwagentLogPath!
   )
   echo Dwagent is set up
