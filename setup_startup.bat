@@ -43,7 +43,7 @@ echo 3: installing the app
 echo 4: installing dwagent
 echo 5: full install
 
-choice /c 123456 /t 30 /d 6 >nul
+choice /c 12345 /t 10 /d 5 >nul
 
 set _e=%ERRORLEVEL%
 
@@ -124,12 +124,12 @@ if %cond%==1 (
   echo Dwagent is set up
 )
 
-if %_e%==6 (
-  echo .
-  echo Exiting due tue timeout
-  pause
-  exit /b
-)
+@REM if %_e%==6 (
+@REM   echo .
+@REM   echo Exiting due tue timeout
+@REM   pause
+@REM   exit /b
+@REM )
 
 if not %_e%==5 (
   echo .
