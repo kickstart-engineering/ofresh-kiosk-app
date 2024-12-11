@@ -56,10 +56,10 @@ if %_e%==1 (
   exit /b
 )
 
-set cond=0
-if %_e%==2 set cond=1
-if %_e%==5 set cond=1
-if %cond%==1 (
+set should_setup_startup_agent=0
+if %_e%==2 set should_setup_startup_agent=1
+if %_e%==5 set should_setup_startup_agent=1
+if %should_setup_startup_agent%==1 (
   echo ========================================
   echo Setting up bootup with PowerShell script instead of explorer
   echo ========================================
@@ -75,6 +75,26 @@ if %cond%==1 (
   
   echo RegEdit Boot up using the script
   reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v Shell /t REG_SZ /d "\"%powershellExe%\" -ExecutionPolicy Bypass -File \"%scriptPath%\"" /f
+
+
+  echo ========================================
+  echo Autologin setup - can be skipped
+  echo ========================================
+
+  
+  set "should_reset_login_credentials=N"
+  set /p "should_reset_login_credentials=Reset credentials for autologin user; Do you want to proceed? (y/N) [N]: "
+  if /i "!should_reset_login_credentials!"=="y" (
+    :: Set the username and password for auto-login
+    reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v "DefaultUserName" /d "ofresh" /f
+    reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v "DefaultPassword" /d "1234" /f
+    reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v "AutoAdminLogon" /t REG_DWORD /d "1" /f
+
+    echo Auto-login has been configured. Please restart your computer for the changes to take effect.
+  ) else (
+    echo Skipping credentials reset
+    exit /b
+  )
 )
 
 @REM set cond=0
@@ -98,10 +118,10 @@ if %cond%==1 (
 @REM   echo App is installed
 @REM )
 
-set cond=0
-if %_e%==4 set cond=1
-if %_e%==5 set cond=1
-if %cond%==1 (
+set should_setup_dwagent=0
+if %_e%==4 set should_setup_dwagent=1
+if %_e%==5 set should_setup_dwagent=1
+if %should_setup_dwagent%==1 (
   echo ========================================
   echo Dwagent setup
   echo ========================================
