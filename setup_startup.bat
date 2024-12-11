@@ -11,6 +11,7 @@ set AppRunningPath=%APPDATA%\..\Local\Programs\ofresh-kiosk-app\%AppName%.exe
 @REM  app
 set AppDataPath=%APPDATA%\%AppName%
 set AppExecutable=%AppDataPath%\%AppName%.exe
+set AppEnvFile=%AppDataPath%\.env
 set GitHubReleaseURL=https://github.com/kickstart-engineering/ofresh-kiosk-app/releases/download/1.0.1/OfreshKioskApp-Setup-1.0.1.exe
 
 set powershellExe=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell
@@ -69,6 +70,7 @@ if %should_setup_startup_agent%==1 (
     mkdir "%targetDir%"
   )
   copy "%~dp0ensure_app_running.ps1" "%scriptPath%" /Y
+  copy "%~dp0.env" "%AppEnvFile%" /Y
 
   echo Ensuring that PowerShell script execution is allowed...
   powershell.exe -Command "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine -Force"
