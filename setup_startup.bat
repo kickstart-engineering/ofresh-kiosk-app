@@ -93,7 +93,6 @@ if %should_setup_startup_agent%==1 (
     echo Auto-login has been configured. Please restart your computer for the changes to take effect.
   ) else (
     echo Skipping credentials reset
-    exit /b
   )
 )
 
@@ -125,6 +124,17 @@ if %should_setup_dwagent%==1 (
   echo ========================================
   echo Dwagent setup
   echo ========================================
+
+  :checkInternet
+  ping -n 1 google.com >nul 2>&1
+  if %errorlevel% neq 0 (
+      echo No internet connection. Retrying in 10 seconds...
+      timeout /t 10 /nobreak >nul
+      goto :checkInternet
+  ) else (
+      echo Internet connection is active.
+  )
+
   @REM if not installed, check if dld
   if not exist "%DwagentExecutable%" (
     echo Dwagent not found in path '%DwagentExecutable%', looking for dld file in '%DwagentDownloadPath%'
