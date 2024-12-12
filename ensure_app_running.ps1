@@ -104,7 +104,7 @@ function Start-App {
 # Loop to keep checking if the app is running, and restart it if necessary
 while ($true) {
     Start-App
-    Start-Sleep -Seconds 15  # Check every 30 seconds if the app is running
+    Start-Sleep -Seconds 120  # Check every 30 seconds if the app is running
 
     $WShell.SendKeys("{SCROLLLOCK}");
 }

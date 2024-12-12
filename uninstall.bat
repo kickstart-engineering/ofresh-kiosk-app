@@ -51,10 +51,36 @@ if exist "%appDataDir%" (
     echo No AppData files found to remove.
 )
 
+set "AppDirName=ofresh-kiosk-app"
+set "APP_INSTALL_PATH=%LocalAppData%\Programs\%AppDirName%"
+set "UNINSTALLER=%APP_INSTALL_PATH%\Uninstall %AppName%.exe"
+set "APP_DATA_DIR=%AppData%\%AppDirName%"
+
+:: Check if uninstaller exists
+if exist "%UNINSTALLER%" (
+    echo Found uninstaller for %APP_NAME%. Running uninstaller...
+    "%UNINSTALLER%" /SILENT /NORESTART
+) else (
+    echo Uninstaller not found. Deleting application files manually...
+    if exist "%APP_INSTALL_PATH%" (
+        echo Deleting files from %APP_INSTALL_PATH%...
+        rmdir /S /Q "%APP_INSTALL_PATH%"
+    ) else (
+        echo Application installation path not found.
+    )
+)
+
+:: Delete user data
+if exist "%APP_DATA_DIR%" (
+    echo Deleting user data from %APP_DATA_DIR%...
+    rmdir /S /Q "%APP_DATA_DIR%"
+) else (
+    echo User data path not found.
+)
+
 :: Remove Registry entry for startup
 echo Removing scheduled reboot startup...
 reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v Shell /t REG_SZ /d "explorer.exe" /f
-
 
 :: Confirmation
 echo ========================================
