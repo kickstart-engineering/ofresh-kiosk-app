@@ -70,7 +70,6 @@ if %should_setup_startup_agent%==1 (
     mkdir "%targetDir%"
   )
   copy "%~dp0ensure_app_running.ps1" "%scriptPath%" /Y
-  copy "%~dp0.env" "%AppEnvFile%" /Y
 
   echo Ensuring that PowerShell script execution is allowed...
   powershell.exe -Command "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine -Force"
@@ -179,6 +178,7 @@ if not exist "%AppDataPath%" (
     mkdir "%AppDataPath%"
 )
 
+copy "%~dp0.env" "%AppEnvFile%" /Y 
 
 ::set to sleepless
 echo ========================================
