@@ -8,6 +8,36 @@ public static extern IntPtr GetConsoleWindow();
 public static extern bool ShowWindow(IntPtr hWnd, Int32 nCmdShow);
 '
 
+$printAsciiCmd = @"
+'"&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&"'
+'"&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&"'
+'"&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&"'
+'"&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&"'
+'"&&&&&&&&&&&&&&&&&&&&x::xX+&xxxxxx&&&Xxxx&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&xxxx&&&&&&&&&&&&&&&&&"'
+'"&&&&&&&&          X+:;;:::::              ;&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&      &&&&&&&&&&&&&&&"'
+'"&&&&&+      .:.   X::x::::&X     +X&Xx     &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&X    &&&&&&&&&&&&&&&"'
+'"&&&&:    +&&&&&&&&X:;:::::&&     &&&&&&   .&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&    &&&&&&&&&&&&&&&"'
+'"&&&;    X&&&&&&&&&&:;::::&&&     &&&&&&&&&     ;     :&&&&+        +&&&&&.        X&&    .      :&&&&&&&"'
+'"&&&    :&&&&&&&&&&&:::+x&&&&           +&&x            &x     ;;     X&:     .     x&             +&&&&&"'
+'"&&&    X&&&&&&&&&&&:;&x X&&&            &&&&    ;&x   .X    &&&&&&    &    X&&&+   &&     X&&&x    &&&&&"'
+'"&&&    ;&&&&&&&&&&&&    &&&&     &&&  ;&&&&&    &&&&X&&.   ++         x+      ;X&&&&&    X&&&&&    &&&&&"'
+'"&&&:    &&&&&&&&&&&.    &&&&     &&&&&&&&&&&    &&&&&&&    +          &&&;        ;&&    &&&&&&    &&&&&"'
+'"&&&&     &&&&&&&&&     X&&&&     &&&&&&&&&&&    &&&&&&&:   .&+&&&&&+&&&&X+&&&X:     &    &&&&&&    &&&&&"'
+'"&&&&&:     ;X&&x      &&&&X+     xX&&&&&&&&&    X&&&&&&&     X&&&:   x&    X&&&X    X    X&&&&&    x&&&&"'
+'"&&&&&&&:            &&&&&&         &&&&&&&        X&&&&&&;           &&.           &       &&&&:     &&&"'
+'"&&&&&&&&&&&+;::;X&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&+.   ;X&&&&&&&:     +&&&&&&&&&&&&&&&&&&&$&&&"'
+'"&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&"'
+'"&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&"'
+'"&&&&&&&&&&&&&&&&&&&&&&&                                                             &&&&&&&&&&&&&&&&&&&&"'
+'"&&&&&&&&&&&&&&&&&&&&&&&       Please be patient while the app is loading...         &&&&&&&&&&&&&&&&&&&&"'
+'"&&&&&&&&&&&&&&&&&&&&&&&                                                             &&&&&&&&&&&&&&&&&&&&"'
+'"&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&"'
+'"&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&"'
+'"&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&"'
+'"&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&"'
+"@
+
+
 # Check if the script is running with administrative privileges
 if (!([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
     # Restart the script with elevated privileges
@@ -17,8 +47,17 @@ if (!([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]
 
 $AgentLogsPath = "C:\logs"
 $AgentLogsFile = "$AgentLogsPath\ensure_app_running_agent.log"
+$readLogsCmd = "Get-Content -Path $AgentLogsFile -Wait -Tail 10"
+$processArgs = "$printAsciiCmd ; $readLogsCmd"
+
+# Check if the log file exists, create it if it doesn't
 if (-not (Test-Path $AgentLogsPath)) {
     New-Item -Path $AgentLogsPath -ItemType Directory -Force
+}
+
+
+if (-not (Test-Path $AgentLogsFile)) {
+    New-Item -Path $AgentLogsFile -ItemType File -Force
 }
 
 function Write-Log {
@@ -138,7 +177,10 @@ Hide-Console
 
 # Loop to keep checking if the app is running, and restart it if necessary
 while ($true) {
-    Start-TailLog
+    
+    if (-not ($TailLogPrrocess -and (Get-Process -Id $TailLogPrrocess.Id))) {
+        $TailLogPrrocess = Start-Process powershell -PassThru -ArgumentList "-NoExit -Command $processArgs"
+    }
 
     Start-App
     
