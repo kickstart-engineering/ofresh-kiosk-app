@@ -75,28 +75,6 @@ function Write-Log {
     Add-Content -Path $AgentLogsFile -Value "$timestamp - $Message"
 }
 
-function Start-TailLog {
-    if (-not (Test-Path $AgentLogsFile)) {
-        Write-Error "Log file not found: $AgentLogsFile"
-        return
-    }
-
-    # Check if the process is already running
-    $processName = "powershell"
-    $processArgs = "Get-Content -Path '$AgentLogsFile' -Tail 10"
-    $isRunning = Get-Process | Where-Object { $_.ProcessName -eq $processName -and $_.Path -Contains $processArgs }
-
-    if ($isRunning) {
-        Write-Log -Message "The process is already running."
-    }
-    else {
-        Start-Process powershell -ArgumentList "-NoExit", "-Command", $processArgs
-        Write-Log -Message "Started tailing the log file."
-    }
-}
-
-Start-TailLog
-
 # Your script code goes here
 Write-Log -Message "Running with administrative privileges"
 
