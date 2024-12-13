@@ -105,7 +105,19 @@ function Start-TailLog {
         Write-Error "Log file not found: $AgentLogsFile"
         return
     }
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", "Get-Content -Path '$AgentLogsFile' -Wait -Tail 30"
+
+    # Check if the process is already running
+    $processName = "powershell"
+    $processArgs = "Get-Content -Path '$AgentLogsFile' -Wait -Tail 10"
+    $isRunning = Get-Process | Where-Object { $_.ProcessName -eq $processName -and $_.Path -eq $processArgs }
+
+    if ($isRunning) {
+        Write-Output "The process is already running."
+    }
+    else {
+        Start-Process powershell -ArgumentList "-NoExit", "-Command", $processArgs
+        Write-Output "Started tailing the log file."
+    }
 }
 
 Hide-Console
