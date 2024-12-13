@@ -75,7 +75,7 @@ if %should_setup_startup_agent%==1 (
   powershell.exe -Command "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine -Force"
   
   echo RegEdit Boot up using the script
-  reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v Shell /t REG_SZ /d "\"%powershellExe%\" -ExecutionPolicy Bypass -File \"%scriptPath%\"" /f
+  reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v Shell /t REG_SZ /d "\"%powershellExe%\" -NoExit -ExecutionPolicy Bypass -File \"%scriptPath%\"" /f
 
 
   echo ========================================

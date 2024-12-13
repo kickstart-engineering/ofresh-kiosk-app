@@ -20,6 +20,12 @@ if (!([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]
 # Your script code goes here
 Write-Output "Running with administrative privileges"
 
+# Redirect input to $null to prevent TTY input
+$input = $null
+
+# Your script code goes here
+Write-Output "This script does not receive TTY input."
+
 # todo: uncomment
 # Hiding the powershllconsole
 # $consolePtr = [Console.Window]::GetConsoleWindow()
@@ -46,17 +52,17 @@ if (-not (Test-Path $AppDataPath)) {
 
 # Check if the app executable is missing and download it if necessary
 if (-not (Test-Path $AppExecutable)) {
-  Write-Host "App not found, downloading"
-  # Wait for an active internet connection
-  Write-Output "Waiting for an active internet connection..."
+    Write-Host "App not found, downloading"
+    # Wait for an active internet connection
+    Write-Output "Waiting for an active internet connection..."
 
-  while (!(Test-Connection -ComputerName "8.8.8.8" -Count 1 -Quiet)) {
-      Write-Output "No internet connection detected. Retrying in 5 seconds..."
-      Start-Sleep -Seconds 5
-  }
-  Write-Output "Internet connection detected."
-  Write-Host "Downloading app..."
-  Invoke-WebRequest -Uri $GitHubReleaseURL -OutFile $AppExecutable
+    while (!(Test-Connection -ComputerName "8.8.8.8" -Count 1 -Quiet)) {
+        Write-Output "No internet connection detected. Retrying in 5 seconds..."
+        Start-Sleep -Seconds 5
+    }
+    Write-Output "Internet connection detected."
+    Write-Host "Downloading app..."
+    Invoke-WebRequest -Uri $GitHubReleaseURL -OutFile $AppExecutable
 }
 
 
@@ -73,26 +79,17 @@ function Get-LicenseKey {
     }
 }
 
-# Ensure license key is set up
-# todo: (1) read from $ConfigFile 
-#       (2) throw if any missing
-# $MACHINE_ID = $ConfigValues.MACHINE_ID
-# $DWAGENT_USER = $ConfigValues.DWAGENT_USER
-# $DWAGENT_PASS = $ConfigValues.DWAGENT_PASS
-# $LICENCESE_KEY = $ConfigValues.LICENCESE_KEY
-
 # Ensure app is running
 function Start-App {
     if (-not (Get-Process -Name $AppName -ErrorAction SilentlyContinue)) {
         Write-Host "Starting $AppName..."
-        if(-not (Test-Path $AppRunningPath)) {
-          Write-Host "App is running for the first time"
-          Start-Process $AppExecutable
+        if (-not (Test-Path $AppRunningPath)) {
+            Write-Host "App is running for the first time"
+            Start-Process $AppExecutable
         }
-        else
-        {
-          Write-Host "App installed already, running it"
-          Start-Process $AppRunningPath
+        else {
+            Write-Host "App installed already, running it"
+            Start-Process $AppRunningPath
         }
     }
     else {
