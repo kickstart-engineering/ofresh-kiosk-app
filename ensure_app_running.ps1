@@ -21,17 +21,51 @@ if (-not (Test-Path $AgentLogsPath)) {
     New-Item -Path $AgentLogsPath -ItemType Directory -Force
 }
 
-# Start transcript to redirect output to a file 
-Start-Transcript -Path $AgentLogsFile
+function Write-Log {
+    param (
+        [string]$Message
+    )
+
+    # Check if the log file exists, create it if it doesn't
+    if (-not (Test-Path $AgentLogsFile)) {
+        New-Item -Path $AgentLogsFile -ItemType File -Force
+    }
+
+    # Append the message to the log file with a timestamp
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    Add-Content -Path $AgentLogsFile -Value "$timestamp - $Message"
+}
+
+function Start-TailLog {
+    if (-not (Test-Path $AgentLogsFile)) {
+        Write-Error "Log file not found: $AgentLogsFile"
+        return
+    }
+
+    # Check if the process is already running
+    $processName = "powershell"
+    $processArgs = "Get-Content -Path '$AgentLogsFile' -Wait -Tail 10"
+    $isRunning = Get-Process | Where-Object { $_.ProcessName -eq $processName -and $_.Path -eq $processArgs }
+
+    if ($isRunning) {
+        Write-Log -Message "The process is already running."
+    }
+    else {
+        Start-Process powershell -ArgumentList "-NoExit", "-Command", $processArgs
+        Write-Log -Message "Started tailing the log file."
+    }
+}
+
+Start-TailLog
 
 # Your script code goes here
-Write-Output "Running with administrative privileges"
+Write-Log -Message "Running with administrative privileges"
 
 # Redirect input to $null to prevent TTY input
 $input = $null
 
 # Your script code goes here
-Write-Output "This script does not receive TTY input."
+Write-Log -Message "This script does not receive TTY input."
 
 # Hiding the powershllconsole
 
@@ -70,13 +104,13 @@ if (-not (Test-Path $AppDataPath)) {
 if (-not (Test-Path $AppExecutable)) {
     Write-Host "App not found, downloading"
     # Wait for an active internet connection
-    Write-Output "Waiting for an active internet connection..."
+    Write-Log -Message "Waiting for an active internet connection..."
 
     while (!(Test-Connection -ComputerName "8.8.8.8" -Count 1 -Quiet)) {
-        Write-Output "No internet connection detected. Retrying in 5 seconds..."
+        Write-Log -Message "No internet connection detected. Retrying in 5 seconds..."
         Start-Sleep -Seconds 5
     }
-    Write-Output "Internet connection detected."
+    Write-Log -Message "Internet connection detected."
     Write-Host "Downloading app..."
     Invoke-WebRequest -Uri $GitHubReleaseURL -OutFile $AppExecutable
 }
@@ -97,26 +131,6 @@ function Start-App {
     }
     else {
         Write-Host "Nothing to do here..."
-    }
-}
-
-function Start-TailLog {
-    if (-not (Test-Path $AgentLogsFile)) {
-        Write-Error "Log file not found: $AgentLogsFile"
-        return
-    }
-
-    # Check if the process is already running
-    $processName = "powershell"
-    $processArgs = "Get-Content -Path '$AgentLogsFile' -Wait -Tail 10"
-    $isRunning = Get-Process | Where-Object { $_.ProcessName -eq $processName -and $_.Path -eq $processArgs }
-
-    if ($isRunning) {
-        Write-Output "The process is already running."
-    }
-    else {
-        Start-Process powershell -ArgumentList "-NoExit", "-Command", $processArgs
-        Write-Output "Started tailing the log file."
     }
 }
 
