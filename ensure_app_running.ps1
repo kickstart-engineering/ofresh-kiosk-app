@@ -45,7 +45,7 @@ function Start-TailLog {
     # Check if the process is already running
     $processName = "powershell"
     $processArgs = "Get-Content -Path '$AgentLogsFile' -Wait -Tail 10"
-    $isRunning = Get-Process | Where-Object { $_.ProcessName -eq $processName -and $_.Path -eq $processArgs }
+    $isRunning = Get-Process | Where-Object { $_.ProcessName -eq $processName -and $_.Path -Contains $processArgs }
 
     if ($isRunning) {
         Write-Log -Message "The process is already running."
