@@ -15,6 +15,15 @@ if (!([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]
     exit
 }
 
+$AgentLogsPath = "C:\logs"
+$AgentLogsFile = "C:$AgentLogsPath\ensure_app_running_agent.log"
+if (-not (Test-Path $AgentLogsPath)) {
+    New-Item -Path $AgentLogsPath -ItemType Directory -Force
+}
+
+# Start transcript to redirect output to a file 
+Start-Transcript -Path $AgentLogsFile
+
 # Your script code goes here
 Write-Output "Running with administrative privileges"
 
@@ -91,11 +100,22 @@ function Start-App {
     }
 }
 
+function Start-TailLog {
+    if (-not (Test-Path $AgentLogsFile)) {
+        Write-Error "Log file not found: $AgentLogsFile"
+        return
+    }
+    Start-Process powershell -ArgumentList "-NoExit", "-Command", "Get-Content -Path '$AgentLogsFile' -Wait -Tail 30"
+}
+
 Hide-Console
 
 # Loop to keep checking if the app is running, and restart it if necessary
 while ($true) {
+    Start-TailLog
+
     Start-App
+    
     Start-Sleep -Seconds 120  # Check every 30 seconds if the app is running
 
     $WShell.SendKeys("{SCROLLLOCK}");
