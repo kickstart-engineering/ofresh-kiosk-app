@@ -7,8 +7,6 @@ public static extern IntPtr GetConsoleWindow();
 [DllImport("user32.dll")]
 public static extern bool ShowWindow(IntPtr hWnd, Int32 nCmdShow);
 '
-## todos
-# (3) enrolment flow using api
 
 # Check if the script is running with administrative privileges
 if (!([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
@@ -26,11 +24,20 @@ $input = $null
 # Your script code goes here
 Write-Output "This script does not receive TTY input."
 
-# todo: uncomment
 # Hiding the powershllconsole
-# $consolePtr = [Console.Window]::GetConsoleWindow()
-# [Console.Window]::ShowWindow($consolePtr, 0)
 
+function Hide-Console {
+    $consolePtr = [Console.Window]::GetConsoleWindow()
+    [Console.Window]::ShowWindow($consolePtr, 0)
+}
+
+# todo: use or remove
+# function Show-Console {
+#     $consolePtr = [Console.Window]::GetConsoleWindow()
+#     [Console.Window]::ShowWindow($consolePtr, 5)
+# }
+
+Hide-Console
 
 # Define variables
 $AppName = "OfreshKioskApp"

@@ -51,14 +51,14 @@ if exist "%appDataDir%" (
     echo No AppData files found to remove.
 )
 
+:: Check if app uninstaller exists
+
 set "AppDirName=ofresh-kiosk-app"
 set "APP_INSTALL_PATH=%LocalAppData%\Programs\%AppDirName%"
-set "UNINSTALLER=%APP_INSTALL_PATH%\Uninstall %AppName%.exe"
+set "APP_UNINSTALLER=%APP_INSTALL_PATH%\Uninstall %AppName%.exe"
 set "APP_DATA_DIR=%AppData%\%AppDirName%"
-
-:: Check if uninstaller exists
-if exist "%UNINSTALLER%" (
-    echo Found uninstaller for %APP_NAME%. Running uninstaller...
+if exist "%APP_UNINSTALLER%" (
+    echo Found APP_uninstaller for %APP_NAME%. Running APP_uninstaller...
     "%UNINSTALLER%" /SILENT /NORESTART
 ) else (
     echo Uninstaller not found. Deleting application files manually...
@@ -69,6 +69,24 @@ if exist "%UNINSTALLER%" (
         echo Application installation path not found.
     )
 )
+
+
+:: Check if dwagent uninstaller exists
+
+set "DWAGENT_UNINSTALLER=C:\Program Files\DWAgent\native\Uninstall.exe"
+if exist "%DWAGENT_UNINSTALLER%" (
+    echo Found APP_uninstaller for %APP_NAME%. Running APP_uninstaller...
+    "%UNINSTALLER%" /SILENT /NORESTART
+) 
+@REM else (
+@REM     echo Uninstaller not found. Deleting application files manually...
+@REM     if exist "%APP_INSTALL_PATH%" (
+@REM         echo Deleting files from %APP_INSTALL_PATH%...
+@REM         rmdir /S /Q "%APP_INSTALL_PATH%"
+@REM     ) else (
+@REM         echo Application installation path not found.
+@REM     )
+@REM )
 
 :: Delete user data
 if exist "%APP_DATA_DIR%" (
