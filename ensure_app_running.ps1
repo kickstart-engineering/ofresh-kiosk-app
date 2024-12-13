@@ -73,19 +73,6 @@ if (-not (Test-Path $AppExecutable)) {
 }
 
 
-
-# Function to validate if the license key exists or if we need to prompt for one
-function Get-LicenseKey {
-    if (Test-Path $LicenseKeyFile) {
-        return Get-Content $LicenseKeyFile
-    }
-    else {
-        $licenseKey = Read-Host "Enter your license key"
-        Set-Content -Path $LicenseKeyFile -Value $licenseKey
-        return $licenseKey
-    }
-}
-
 # Ensure app is running
 function Start-App {
     if (-not (Get-Process -Name $AppName -ErrorAction SilentlyContinue)) {
@@ -104,6 +91,7 @@ function Start-App {
     }
 }
 
+Hide-Console
 
 # Loop to keep checking if the app is running, and restart it if necessary
 while ($true) {
