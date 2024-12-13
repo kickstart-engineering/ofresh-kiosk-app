@@ -16,7 +16,7 @@ if (!([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]
 }
 
 $AgentLogsPath = "C:\logs"
-$AgentLogsFile = "C:$AgentLogsPath\ensure_app_running_agent.log"
+$AgentLogsFile = "$AgentLogsPath\ensure_app_running_agent.log"
 if (-not (Test-Path $AgentLogsPath)) {
     New-Item -Path $AgentLogsPath -ItemType Directory -Force
 }
