@@ -47,8 +47,15 @@ if (!([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]
 
 $AgentLogsPath = "C:\logs"
 $AgentLogsFile = "$AgentLogsPath\ensure_app_running_agent.log"
-$readLogsCmd = "Get-Content -Path $AgentLogsFile -Wait -Tail 10"
-$processArgs = "$printAsciiCmd ; $readLogsCmd"
+$readLogsCmd = "Get-Content -Path $AgentLogsFile -Tail 10;"
+
+$setCursor = "[Console]::SetCursorPosition(0,26);"
+$emptychar = '`0 ' *100 +' `n';
+# $emptychar = '`0 ' *50 +'. '+' `n';
+$lines = $emptychar * 12;
+$trueval = '$true'
+$loop = "while($trueval) {$setCursor Write-Host $lines; $setCursor $readLogsCmd Start-Sleep -Seconds 2}"
+$processArgs = "$printAsciiCmd; $loop"
 
 # Check if the log file exists, create it if it doesn't
 if (-not (Test-Path $AgentLogsPath)) {
@@ -120,6 +127,7 @@ if (-not (Test-Path $AppDataPath)) {
 # Check if the app executable is missing and download it if necessary
 if (-not (Test-Path $AppExecutable)) {
     Write-Host "App not found, downloading"
+    Write-Log "App not found, downloading"
     # Wait for an active internet connection
     Write-Log -Message "Waiting for an active internet connection..."
 
@@ -129,6 +137,8 @@ if (-not (Test-Path $AppExecutable)) {
     }
     Write-Log -Message "Internet connection detected."
     Write-Host "Downloading app..."
+    Write-Log "Downloading app..."
+    
     Invoke-WebRequest -Uri $GitHubReleaseURL -OutFile $AppExecutable
 }
 
@@ -136,18 +146,18 @@ if (-not (Test-Path $AppExecutable)) {
 # Ensure app is running
 function Start-App {
     if (-not (Get-Process -Name $AppName -ErrorAction SilentlyContinue)) {
-        Write-Host "Starting $AppName..."
+        Write-Log "Starting $AppName..."
         if (-not (Test-Path $AppRunningPath)) {
-            Write-Host "App is running for the first time"
+            Write-Log "App is running for the first time"
             Start-Process $AppExecutable
         }
         else {
-            Write-Host "App installed already, running it"
+            Write-Log "App installed already, running it"
             Start-Process $AppRunningPath
         }
     }
     else {
-        Write-Host "Nothing to do here..."
+        Write-Log "Nothing to do here..."
     }
 }
 
@@ -157,7 +167,7 @@ Hide-Console
 while ($true) {
     
     if (-not ($TailLogPrrocess -and (Get-Process -Id $TailLogPrrocess.Id))) {
-        $TailLogPrrocess = Start-Process powershell -PassThru -ArgumentList "-NoExit -Command $processArgs"
+        $TailLogPrrocess = Start-Process powershell -PassThru -ArgumentList "-NoExit -WindowStyle Maximized -Command $processArgs"
     }
 
     Start-App
