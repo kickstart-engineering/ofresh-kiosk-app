@@ -170,6 +170,11 @@ while ($true) {
         $TailLogPrrocess = Start-Process powershell -PassThru -ArgumentList "-NoExit -WindowStyle Maximized -Command $processArgs"
     }
 
+    while (!(Test-Connection -ComputerName "8.8.8.8" -Count 1 -Quiet)) {
+        Write-Log -Message "No internet connection detected. Retrying in 5 seconds..."
+        Start-Sleep -Seconds 5
+    }
+
     Start-App
     
     Start-Sleep -Seconds 120  # Check every 30 seconds if the app is running
