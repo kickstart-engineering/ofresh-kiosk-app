@@ -50,7 +50,7 @@ $AgentLogsFile = "$AgentLogsPath\ensure_app_running_agent.log"
 $readLogsCmd = "Get-Content -Path $AgentLogsFile -Tail 10;"
 
 $setCursor = "[Console]::SetCursorPosition(0,26);"
-$emptychar = '`0 ' *100 +' `n';
+$emptychar = '`0 ' * 100 + ' `n';
 # $emptychar = '`0 ' *50 +'. '+' `n';
 $lines = $emptychar * 12;
 $trueval = '$true'
@@ -104,8 +104,6 @@ function Hide-Console {
 #     [Console.Window]::ShowWindow($consolePtr, 5)
 # }
 
-Hide-Console
-
 # Define variables
 $AppName = "OfreshKioskApp"
 $AppDataPath = "$env:APPDATA\$AppName"
@@ -118,7 +116,6 @@ $GitHubReleaseURL = "https://github.com/kickstart-engineering/ofresh-kiosk-app/r
 
 $WShell = New-Object -Com Wscript.Shell
 
-
 # Ensure the script is running with administrator privileges
 if (-not (Test-Path $AppDataPath)) {
     New-Item -Path $AppDataPath -ItemType Directory -Force
@@ -128,19 +125,28 @@ if (-not (Test-Path $AppDataPath)) {
 if (-not (Test-Path $AppExecutable)) {
     Write-Host "App not found, downloading"
     Write-Log "App not found, downloading"
+
     # Wait for an active internet connection
+    Write-Host "Waiting for an active internet connection..."
     Write-Log -Message "Waiting for an active internet connection..."
 
     while (!(Test-Connection -ComputerName "8.8.8.8" -Count 1 -Quiet)) {
         Write-Log -Message "No internet connection detected. Retrying in 5 seconds..."
+        Write-Host "No internet connection detected. Retrying in 5 seconds..."
+        
         Start-Sleep -Seconds 5
     }
+
     Write-Log -Message "Internet connection detected."
+    Write-Host "Internet connection detected."
+    
+    Write-Log -Message "Downloading app..."
     Write-Host "Downloading app..."
-    Write-Log "Downloading app..."
     
     Invoke-WebRequest -Uri $GitHubReleaseURL -OutFile $AppExecutable
 }
+
+Hide-Console
 
 
 # Ensure app is running
@@ -160,8 +166,6 @@ function Start-App {
         Write-Log "Nothing to do here..."
     }
 }
-
-Hide-Console
 
 # Loop to keep checking if the app is running, and restart it if necessary
 while ($true) {
