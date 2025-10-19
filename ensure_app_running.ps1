@@ -46,6 +46,7 @@ if (!([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]
 }
 
 $AgentLogsPath = "C:\logs"
+$MainLogPath = "C:\logs\main.log"
 $AgentLogsFile = "$AgentLogsPath\ensure_app_running_agent.log"
 $readLogsCmd = "Get-Content -Path $AgentLogsFile -Tail 10;"
 
@@ -148,11 +149,49 @@ if (-not (Test-Path $AppExecutable)) {
 
 Hide-Console
 
+# Function to check if main log is stale (older than 3 minutes)
+function Is-Main-Log-Stale {
+    if (-not (Test-Path $MainLogPath)) {
+        Write-Log "Log file not found, treating as stale."
+        return $true
+    }
+
+    $LastLine = Get-Content $MainLogPath -Tail 1
+
+    # Match timestamp with optional milliseconds
+    if ($LastLine -match '\[(?<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d{3})?)\]') {
+        try {
+            $LastTimestamp = [datetime]::ParseExact($matches['ts'], 'yyyy-MM-dd HH:mm:ss.fff', $null)
+        } catch {
+            $LastTimestamp = [datetime]::ParseExact($matches['ts'], 'yyyy-MM-dd HH:mm:ss', $null)
+        }
+
+        $Now = Get-Date
+        $AgeMinutes = ($Now - $LastTimestamp).TotalMinutes
+
+        if ($AgeMinutes -gt 3) {
+            Write-Log "Last log entry is stale (older than 3 minutes)."
+            return $true
+        } else {
+            Write-Log "Last main process log entry is $([math]::Round($AgeMinutes,2)) minutes old"
+            return $false
+        }
+    }
+    else {
+        Write-Log "Could not parse timestamp from last log line, treating as stale."
+        return $true
+    }
+}
+
 
 # Ensure app is running
 function Start-App {
-    if (-not (Get-Process -Name $AppName -ErrorAction SilentlyContinue)) {
+	$MainLogIsstale = Is-Main-Log-Stale
+    if (-not (Get-Process -Name $AppName -ErrorAction SilentlyContinue) -or ($MainLogIsstale)) {
         Write-Log "Starting $AppName..."
+        if ( $MainLogIsStale ) {
+        	Write-Log "Found stale main log"
+        }
         if (-not (Test-Path $AppRunningPath)) {
             Write-Log "App is running for the first time"
             Start-Process $AppExecutable
@@ -163,7 +202,7 @@ function Start-App {
         }
     }
     else {
-        Write-Log "Nothing to do here..."
+        Write-Log "Nothing to do here"
     }
 }
 
