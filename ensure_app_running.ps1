@@ -48,6 +48,19 @@ if (!([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]
 $AgentLogsPath = "C:\logs"
 $MainLogPath = "C:\logs\main.log"
 $AgentLogsFile = "$AgentLogsPath\ensure_app_running_agent.log"
+
+# Reboot-on-request channel: the kiosk app drops this JSON signal file when an
+# error-31 MDB/USB fault persists past what in-app re-enumeration can recover (see
+# picovend-mdb.ts -> maybeRequestReboot). The watchdog runs elevated, so it can do
+# the one thing that reliably re-enumerates a CH340 stuck off the bus: reboot the PC.
+$RebootRequestFile = "$AgentLogsPath\reboot-request.json"
+# Persists the last watchdog-initiated reboot time across boots so a permanently
+# dead device can't drive a reboot loop.
+$LastRebootMarker = "$AgentLogsPath\last-watchdog-reboot.txt"
+# Ignore requests older than this (stale file left by a crash or a prior boot).
+$RebootRequestMaxAgeMinutes = 5
+# Never reboot more than once per this window.
+$MinMinutesBetweenReboots = 15
 $readLogsCmd = "Get-Content -Path $AgentLogsFile -Tail 10;"
 
 $setCursor = "[Console]::SetCursorPosition(0,26);"
@@ -184,6 +197,73 @@ function Is-Main-Log-Stale {
 }
 
 
+# Reboot the PC if the app asked us to via $RebootRequestFile. Validates the
+# request is fresh (not a leftover stale file) and rate-limits reboots so a
+# permanently faulty device cannot cause a reboot loop. Consumes the request and
+# records the reboot time before rebooting so we don't loop after coming back.
+function Invoke-RebootIfRequested {
+    if (-not (Test-Path $RebootRequestFile)) {
+        return
+    }
+
+    Write-Log "Reboot request found at $RebootRequestFile"
+
+    $requestedAt = $null
+    $reason = "(unspecified)"
+    try {
+        $request = Get-Content -Path $RebootRequestFile -Raw | ConvertFrom-Json
+        if ($request.requestedAt) { $requestedAt = [datetime]$request.requestedAt }
+        if ($request.reason) { $reason = $request.reason }
+    }
+    catch {
+        Write-Log "Could not parse reboot request ($($_.Exception.Message)) - ignoring and removing"
+        Remove-Item -Path $RebootRequestFile -Force -ErrorAction SilentlyContinue
+        return
+    }
+
+    if ($null -eq $requestedAt) {
+        Write-Log "Reboot request missing requestedAt - ignoring and removing"
+        Remove-Item -Path $RebootRequestFile -Force -ErrorAction SilentlyContinue
+        return
+    }
+
+    $ageMinutes = ((Get-Date) - $requestedAt).TotalMinutes
+    if ($ageMinutes -gt $RebootRequestMaxAgeMinutes) {
+        Write-Log "Reboot request is stale ($([math]::Round($ageMinutes,1)) min old) - ignoring and removing"
+        Remove-Item -Path $RebootRequestFile -Force -ErrorAction SilentlyContinue
+        return
+    }
+
+    # Rate-limit: don't reboot again within $MinMinutesBetweenReboots. Leave the
+    # request in place (the app keeps it fresh while still stuck) so we can act
+    # once the window passes.
+    if (Test-Path $LastRebootMarker) {
+        try {
+            $lastReboot = [datetime]((Get-Content -Path $LastRebootMarker -Raw).Trim())
+            $sinceLast = ((Get-Date) - $lastReboot).TotalMinutes
+            if ($sinceLast -lt $MinMinutesBetweenReboots) {
+                Write-Log "Reboot requested (reason: $reason) but last reboot was $([math]::Round($sinceLast,1)) min ago (< $MinMinutesBetweenReboots) - skipping to avoid a reboot loop"
+                return
+            }
+        }
+        catch {
+            # Unparseable marker - fall through and allow the reboot.
+            Write-Log "Could not read last-reboot marker - allowing reboot"
+        }
+    }
+
+    Write-Log "Reboot requested by app (reason: $reason, age $([math]::Round($ageMinutes,1)) min) - rebooting PC now"
+
+    # Consume the request and record the reboot so we don't loop after coming back.
+    Remove-Item -Path $RebootRequestFile -Force -ErrorAction SilentlyContinue
+    Set-Content -Path $LastRebootMarker -Value (Get-Date -Format "o")
+
+    Restart-Computer -Force
+    # Restart-Computer starts an async shutdown; stop the watchdog so it does no
+    # further work this cycle.
+    exit
+}
+
 # Ensure app is running
 function Start-App {
 	$MainLogIsstale = Is-Main-Log-Stale
@@ -208,7 +288,11 @@ function Start-App {
 
 # Loop to keep checking if the app is running, and restart it if necessary
 while ($true) {
-    
+
+    # Honour an app-requested reboot first (error-31 recovery). Checked before the
+    # internet wait below since the MDB/USB fault is independent of connectivity.
+    Invoke-RebootIfRequested
+
     if (-not ($TailLogPrrocess -and (Get-Process -Id $TailLogPrrocess.Id))) {
         $TailLogPrrocess = Start-Process powershell -PassThru -ArgumentList "-NoExit -WindowStyle Maximized -Command $processArgs"
     }
