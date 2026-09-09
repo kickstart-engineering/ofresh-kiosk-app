@@ -73,9 +73,12 @@ function Write-Log {
         [string]$Message
     )
 
-    # Check if the log file exists, create it if it doesn't
+    # Check if the log file exists, create it if it doesn't.
+    # Out-Null keeps New-Item's FileInfo out of the pipeline: Write-Log is
+    # called from functions whose return value is used as a boolean, and a
+    # leaked object there would corrupt it.
     if (-not (Test-Path $AgentLogsFile)) {
-        New-Item -Path $AgentLogsFile -ItemType File -Force
+        New-Item -Path $AgentLogsFile -ItemType File -Force | Out-Null
     }
 
     # Append the message to the log file with a timestamp
@@ -184,25 +187,61 @@ function Is-Main-Log-Stale {
 }
 
 
+# How long a freshly started app is given to write its first main.log entry
+# before the staleness check is allowed to act on it again.
+$StartGraceMinutes = 5
+$script:LastAppStartTime = $null
+
 # Ensure app is running
 function Start-App {
-	$MainLogIsstale = Is-Main-Log-Stale
-    if (-not (Get-Process -Name $AppName -ErrorAction SilentlyContinue) -or ($MainLogIsstale)) {
-        Write-Log "Starting $AppName..."
-        if ( $MainLogIsStale ) {
-        	Write-Log "Found stale main log"
-        }
-        if (-not (Test-Path $AppRunningPath)) {
-            Write-Log "App is running for the first time"
-            Start-Process $AppExecutable
-        }
-        else {
-            Write-Log "App installed already, running it"
-            Start-Process $AppRunningPath
+    $MainLogIsStale = Is-Main-Log-Stale
+    $RunningProcesses = @(Get-Process -Name $AppName -ErrorAction SilentlyContinue)
+
+    if ($RunningProcesses.Count -gt 0 -and -not $MainLogIsStale) {
+        Write-Log "Nothing to do here"
+        return
+    }
+
+    # A restart leaves the log stale until the new instance writes to it, so
+    # hold off on acting for a grace period. Without this an app that stops
+    # logging would be killed on every pass.
+    if ($RunningProcesses.Count -gt 0 -and $script:LastAppStartTime) {
+        $MinutesSinceStart = ((Get-Date) - $script:LastAppStartTime).TotalMinutes
+        if ($MinutesSinceStart -lt $StartGraceMinutes) {
+            Write-Log "Main log is stale but $AppName started $([math]::Round($MinutesSinceStart,2)) minutes ago, waiting"
+            return
         }
     }
+
+    if ($RunningProcesses.Count -gt 0) {
+        # The app is alive but hung. Stop it before starting again: a second
+        # instance would contend with the first for the CH340 serial port.
+        Write-Log "Found stale main log, stopping $($RunningProcesses.Count) running $AppName process(es)"
+
+        foreach ($RunningProcess in $RunningProcesses) {
+            try {
+                Stop-Process -Id $RunningProcess.Id -Force -ErrorAction Stop
+                Write-Log "Stopped $AppName (PID $($RunningProcess.Id))"
+            }
+            catch {
+                Write-Log "Failed to stop $AppName (PID $($RunningProcess.Id)): $_"
+            }
+        }
+
+        # Give Windows a moment to release the serial port handle.
+        Start-Sleep -Seconds 5
+    }
+
+    Write-Log "Starting $AppName..."
+    $script:LastAppStartTime = Get-Date
+
+    if (-not (Test-Path $AppRunningPath)) {
+        Write-Log "App is running for the first time"
+        Start-Process $AppExecutable
+    }
     else {
-        Write-Log "Nothing to do here"
+        Write-Log "App installed already, running it"
+        Start-Process $AppRunningPath
     }
 }
 
