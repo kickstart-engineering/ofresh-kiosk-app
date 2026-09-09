@@ -1,0 +1,38 @@
+# The kiosk application itself.
+#
+# This is a USER unit: it runs inside the graphical session as the kiosk user,
+# which is what lets it talk to the display server. Install it globally with
+#   systemctl --global enable ofresh-kiosk.service
+#
+# It replaces the `while ($true) { Start-App }` loop in ensure_app_running.ps1.
+# Restart=always covers the crash case. The hung case -- the app is alive but
+# has stopped writing main.log -- is covered by ofresh-kiosk-liveness.timer
+# until the app itself learns to talk to the systemd watchdog, at which point
+# the commented Type=notify block below takes over and the timer stands down.
+
+[Unit]
+Description=OFresh kiosk application
+Documentation=https://github.com/kickstart-engineering/ofresh-kiosk-app
+PartOf=graphical-session.target
+After=graphical-session.target
+# A kiosk never gives up: without this, systemd stops trying after 5 restarts
+# in 10s and the fridge is dead until someone drives to it.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/ofresh/kiosk.env
+ExecStart=/opt/ofresh/kiosk-app/ofresh-kiosk-app
+Restart=always
+RestartSec=5
+SyslogIdentifier=ofresh-kiosk
+
+# Phase 2, once the Electron main process calls sd_notify (ofresh-kiosk repo):
+# swap Type=simple for Type=notify, uncomment WatchdogSec, and set
+# OFRESH_LIVENESS_ENABLED=0 in /etc/ofresh/kiosk.env. systemd then supervises
+# liveness directly and ofresh-kiosk-liveness becomes a no-op.
+#Type=notify
+#WatchdogSec=180
+
+[Install]
+WantedBy=graphical-session.target

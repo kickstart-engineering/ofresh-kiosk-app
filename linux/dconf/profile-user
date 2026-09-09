@@ -1,0 +1,6 @@
+# Installed to /etc/dconf/profile/user.
+#
+# Order matters: user-db first so per-user settings still work for anything not
+# locked, then the system kiosk database supplying the defaults and the locks.
+user-db:user
+system-db:kiosk

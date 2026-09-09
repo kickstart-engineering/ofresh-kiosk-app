@@ -1,0 +1,20 @@
+# Deliberately empty. This file shadows /usr/lib/udev/rules.d/85-brltty.rules.
+#
+# brltty is the braille display daemon Ubuntu installs by default. It claims
+# USB-serial adapters that share a VID:PID with braille hardware -- CH340
+# (1a86:7523) among them -- and this is the single most common way a CH340
+# project fails on modern Ubuntu: /dev/ttyUSB0 appears at boot, then vanishes a
+# few seconds later when brltty grabs it. The kiosk sees the MDB reader
+# disappear for no visible reason, which looks exactly like the USB fault the
+# error-31 work is chasing.
+#
+# udev resolves rule files by name, and /etc wins over /usr/lib, so an empty
+# file here disables brltty's rules outright. That is the intent: a kiosk has
+# no braille display attached.
+#
+# install.sh also masks brltty.service and brltty-udev.service. If you would
+# rather not have the package at all:
+#
+#     sudo apt-get purge brltty
+#
+# Deleting this file restores stock brltty behaviour.

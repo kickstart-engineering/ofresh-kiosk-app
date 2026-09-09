@@ -1,0 +1,57 @@
+name: lint
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install shellcheck
+        run: sudo apt-get update -q && sudo apt-get install -y -q shellcheck
+      - name: Lint shell scripts
+        run: |
+          shellcheck -x \
+            linux/install.sh \
+            linux/uninstall.sh \
+            linux/bin/ofresh-liveness \
+            linux/bin/ofresh-usb-recover \
+            linux/bin/ofresh-recovery
+
+  systemd:
+    name: systemd units
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # systemd-analyze checks that ExecStart actually exists, so stage the
+      # paths the units reference. Without this every unit reports a missing
+      # command and the check is worthless.
+      - name: Stage referenced paths
+        run: |
+          sudo install -d /opt/ofresh/bin /opt/ofresh/kiosk-app /etc/ofresh
+          sudo install -m 0755 linux/bin/ofresh-liveness linux/bin/ofresh-usb-recover linux/bin/ofresh-recovery /opt/ofresh/bin/
+          printf '#!/bin/sh\nexit 0\n' | sudo tee /opt/ofresh/kiosk-app/ofresh-kiosk-app > /dev/null
+          sudo chmod +x /opt/ofresh/kiosk-app/ofresh-kiosk-app
+          sudo install -m 0644 linux/config/kiosk.env.template /etc/ofresh/kiosk.env
+
+      - name: Verify system units
+        run: |
+          systemd-analyze verify \
+            linux/systemd/ofresh-kiosk-recovery.service \
+            linux/systemd/ofresh-kiosk-recovery.timer
+
+      - name: Verify user units
+        run: |
+          export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          mkdir -p "$XDG_RUNTIME_DIR"
+          systemd-analyze --user verify \
+            linux/systemd/ofresh-kiosk.service \
+            linux/systemd/ofresh-kiosk-liveness.service \
+            linux/systemd/ofresh-kiosk-liveness.timer
+
+      - name: Installer dry-run
+        run: sudo bash linux/install.sh --user root --dry-run

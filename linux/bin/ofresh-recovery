@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+#
+# Consume the app's reboot-request signal and act on it.
+#
+# The Linux counterpart to Invoke-RebootIfRequested in ensure_app_running.ps1.
+# Same protocol, same freshness and rate-limit guarantees, one extra step: try
+# a USB rebind first and only reboot if that fails to bring the device back.
+#
+# Runs as root, from ofresh-kiosk-recovery.timer. Because this unit is the only
+# thing that reboots the machine, the kiosk user needs no reboot privilege of
+# its own -- no polkit rule, no sudoers entry, and nothing resembling the
+# EnableLUA=0 that the Windows installer applies machine-wide.
+
+set -euo pipefail
+
+REQUEST="${OFRESH_REBOOT_REQUEST:-/run/ofresh/reboot-request.json}"
+STATE_DIR="${OFRESH_STATE_DIR:-/var/lib/ofresh}"
+MAX_AGE="${OFRESH_REBOOT_REQUEST_MAX_AGE_SECONDS:-300}"
+MIN_BETWEEN="${OFRESH_MIN_SECONDS_BETWEEN_REBOOTS:-900}"
+USB_RECOVER_ENABLED="${OFRESH_USB_RECOVER_ENABLED:-1}"
+
+LAST_REBOOT_FILE="$STATE_DIR/last-reboot"
+USB_RECOVER_BIN=/opt/ofresh/bin/ofresh-usb-recover
+
+log() { printf '%s\n' "$*"; }
+
+[ -e "$REQUEST" ] || exit 0
+
+now="$(date +%s)"
+requested_at="$(stat -c %Y "$REQUEST")"
+age=$(( now - requested_at ))
+
+# Log whatever the app put in the file, for whoever reads the journal later.
+# The file's mtime is what we actually trust: it cannot be malformed, and it
+# needs no JSON parser in a root-privileged script.
+if [ -s "$REQUEST" ]; then
+    log "Reboot request found (${age}s old): $(tr -d '\n' < "$REQUEST" | head -c 500)"
+else
+    log "Reboot request found (${age}s old), empty file"
+fi
+
+# Freshness. The request lives on tmpfs, so unlike the Windows original it
+# cannot survive a boot -- this only has to catch a request that went stale
+# while the machine stayed up.
+if [ "$age" -gt "$MAX_AGE" ]; then
+    log "Request is older than ${MAX_AGE}s; discarding it without acting"
+    rm -f "$REQUEST"
+    exit 0
+fi
+
+# Rate limit, persisted across reboots. Without this a permanently dead reader
+# reboots the kiosk forever.
+if [ -s "$LAST_REBOOT_FILE" ]; then
+    last_reboot="$(cat "$LAST_REBOOT_FILE")"
+
+    if [ -n "${last_reboot//[0-9]/}" ]; then
+        log "$LAST_REBOOT_FILE does not contain a timestamp; ignoring it"
+    else
+        since_reboot=$(( now - last_reboot ))
+
+        if [ "$since_reboot" -lt "$MIN_BETWEEN" ]; then
+            log "Rebooted ${since_reboot}s ago, under the ${MIN_BETWEEN}s minimum; discarding this request"
+            # Dropped rather than deferred: MAX_AGE is shorter than
+            # MIN_BETWEEN, so a request held back here could only go stale.
+            # Leaving it would mean rebooting for a fault that has long passed.
+            rm -f "$REQUEST"
+            exit 0
+        fi
+    fi
+fi
+
+# Rung 3: try to fix the bus without costing a boot cycle.
+if [ "$USB_RECOVER_ENABLED" = "1" ] && [ -x "$USB_RECOVER_BIN" ]; then
+    log "Attempting USB recovery before falling back to a reboot"
+
+    if "$USB_RECOVER_BIN"; then
+        log "USB recovery succeeded; no reboot needed"
+        rm -f "$REQUEST"
+        exit 0
+    fi
+
+    log "USB recovery did not bring the device back"
+fi
+
+# Rung 4: reboot. Record the time BEFORE rebooting -- if we recorded it after,
+# we would never get there, and the rate limit would never engage.
+log "Rebooting"
+mkdir -p "$STATE_DIR"
+printf '%s' "$now" > "$LAST_REBOOT_FILE"
+rm -f "$REQUEST"
+
+systemctl reboot
