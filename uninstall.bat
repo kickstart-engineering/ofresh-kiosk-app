@@ -58,8 +58,8 @@ set "APP_INSTALL_PATH=%LocalAppData%\Programs\%AppDirName%"
 set "APP_UNINSTALLER=%APP_INSTALL_PATH%\Uninstall %AppName%.exe"
 set "APP_DATA_DIR=%AppData%\%AppDirName%"
 if exist "%APP_UNINSTALLER%" (
-    echo Found APP_uninstaller for %APP_NAME%. Running APP_uninstaller...
-    "%UNINSTALLER%" /SILENT /NORESTART
+    echo Found uninstaller for %AppName%. Running uninstaller...
+    "%APP_UNINSTALLER%" /SILENT /NORESTART
 ) else (
     echo Uninstaller not found. Deleting application files manually...
     if exist "%APP_INSTALL_PATH%" (
@@ -75,8 +75,8 @@ if exist "%APP_UNINSTALLER%" (
 
 set "DWAGENT_UNINSTALLER=C:\Program Files\DWAgent\native\Uninstall.exe"
 if exist "%DWAGENT_UNINSTALLER%" (
-    echo Found APP_uninstaller for %APP_NAME%. Running APP_uninstaller...
-    "%UNINSTALLER%" /SILENT /NORESTART
+    echo Found uninstaller for DWAgent. Running uninstaller...
+    "%DWAGENT_UNINSTALLER%" /SILENT /NORESTART
 ) 
 @REM else (
 @REM     echo Uninstaller not found. Deleting application files manually...
