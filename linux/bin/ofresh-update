@@ -1,0 +1,182 @@
+#!/usr/bin/env python3
+"""Install the latest fridge AppImage before the kiosk service starts."""
+
+from __future__ import annotations
+
+import base64
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+import tempfile
+import time
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
+
+
+APP_PATH = Path(
+    os.environ.get(
+        "OFRESH_APPIMAGE_PATH",
+        "/opt/ofresh/kiosk-app/OfreshKioskApp.AppImage",
+    )
+)
+REPOSITORY = os.environ.get(
+    "OFRESH_UPDATE_REPOSITORY", "kickstart-engineering/ofresh-kiosk"
+)
+TAG_PREFIX = os.environ.get("OFRESH_UPDATE_TAG_PREFIX", "fridge-v")
+CHECK_INTERVAL = int(os.environ.get("OFRESH_UPDATE_CHECK_INTERVAL_SECONDS", "300"))
+STAMP_PATH = APP_PATH.parent / ".last-update-check"
+
+
+def log(message: str) -> None:
+    print(message, flush=True)
+
+
+def token() -> str:
+    configured = os.environ.get("OFRESH_UPDATE_TOKEN") or os.environ.get(
+        "GITHUB_TOKEN"
+    )
+    if configured:
+        return configured
+
+    try:
+        return subprocess.run(
+            ["gh", "auth", "token"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return ""
+
+
+def github_bytes(url: str, access_token: str, accept: str) -> bytes:
+    headers = {
+        "Accept": accept,
+        "User-Agent": "ofresh-linux-updater",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    if access_token:
+        headers["Authorization"] = f"Bearer {access_token}"
+    with urlopen(Request(url, headers=headers), timeout=60) as response:
+        return response.read()
+
+
+def installed_sha512() -> str | None:
+    if not APP_PATH.is_file():
+        return None
+    digest = hashlib.sha512()
+    with APP_PATH.open("rb") as appimage:
+        for chunk in iter(lambda: appimage.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return base64.b64encode(digest.digest()).decode("ascii")
+
+
+def fail(message: str) -> int:
+    if APP_PATH.is_file():
+        log(f"Update check failed; keeping the installed AppImage: {message}")
+        return 0
+    log(f"Update check failed and no AppImage is installed: {message}")
+    return 1
+
+
+def main() -> int:
+    if os.environ.get("OFRESH_UPDATE_ENABLED", "1") != "1":
+        if APP_PATH.is_file():
+            log("External AppImage updater is disabled")
+            return 0
+        return fail("OFRESH_UPDATE_ENABLED is not 1")
+
+    if APP_PATH.is_file() and STAMP_PATH.is_file():
+        age = time.time() - STAMP_PATH.stat().st_mtime
+        if age < CHECK_INTERVAL:
+            log(f"Skipping update check; last check was {int(age)}s ago")
+            return 0
+
+    access_token = token()
+    api_url = f"https://api.github.com/repos/{REPOSITORY}/releases?per_page=100"
+
+    try:
+        releases = json.loads(
+            github_bytes(api_url, access_token, "application/vnd.github+json")
+        )
+        version_pattern = re.compile(
+            rf"^{re.escape(TAG_PREFIX)}(\d+)\.(\d+)\.(\d+)$"
+        )
+        candidates = []
+        for release in releases:
+            match = version_pattern.fullmatch(release.get("tag_name", ""))
+            if match and not release.get("draft") and not release.get("prerelease"):
+                candidates.append((tuple(map(int, match.groups())), release))
+        if not candidates:
+            return fail(f"no {TAG_PREFIX}* release exists in {REPOSITORY}")
+
+        _, release = max(candidates, key=lambda candidate: candidate[0])
+        assets = {asset["name"]: asset for asset in release.get("assets", [])}
+        metadata_asset = assets.get("latest-linux.yml")
+        appimage_assets = [
+            asset for name, asset in assets.items() if name.endswith(".AppImage")
+        ]
+        if not metadata_asset or len(appimage_assets) != 1:
+            return fail("release must contain latest-linux.yml and one AppImage")
+
+        metadata = github_bytes(
+            metadata_asset["url"], access_token, "application/octet-stream"
+        ).decode("utf-8")
+        sha_match = re.search(r"^sha512:\s*(\S+)\s*$", metadata, re.MULTILINE)
+        if not sha_match:
+            return fail("latest-linux.yml does not contain sha512")
+        expected_sha512 = sha_match.group(1)
+
+        if installed_sha512() == expected_sha512:
+            STAMP_PATH.touch()
+            log(f"AppImage is current ({release['tag_name']})")
+            return 0
+
+        APP_PATH.parent.mkdir(parents=True, exist_ok=True)
+        temporary_path: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                dir=APP_PATH.parent, prefix=".OfreshKioskApp.", delete=False
+            ) as temporary:
+                temporary_path = Path(temporary.name)
+                digest = hashlib.sha512()
+                request = Request(
+                    appimage_assets[0]["url"],
+                    headers={
+                        "Accept": "application/octet-stream",
+                        "User-Agent": "ofresh-linux-updater",
+                        **(
+                            {"Authorization": f"Bearer {access_token}"}
+                            if access_token
+                            else {}
+                        ),
+                    },
+                )
+                with urlopen(request, timeout=300) as response:
+                    while chunk := response.read(1024 * 1024):
+                        temporary.write(chunk)
+                        digest.update(chunk)
+
+            actual_sha512 = base64.b64encode(digest.digest()).decode("ascii")
+            if actual_sha512 != expected_sha512:
+                return fail("downloaded AppImage checksum does not match release metadata")
+
+            temporary_path.chmod(0o755)
+            os.replace(temporary_path, APP_PATH)
+            temporary_path = None
+            STAMP_PATH.touch()
+            log(f"Installed {release['tag_name']} from {REPOSITORY}")
+            return 0
+        finally:
+            if temporary_path is not None:
+                temporary_path.unlink(missing_ok=True)
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError) as error:
+        return fail(str(error))
+
+
+if __name__ == "__main__":
+    sys.exit(main())

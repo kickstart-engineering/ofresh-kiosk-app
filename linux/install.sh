@@ -112,7 +112,7 @@ fi
 # --- Executables and units ---------------------------------------------------
 
 info "Installing helper scripts to $PREFIX/bin"
-for script in ofresh-liveness ofresh-recovery; do
+for script in ofresh-liveness ofresh-recovery ofresh-update; do
     run install -m 0755 "$SRC_DIR/bin/$script" "$PREFIX/bin/$script"
 done
 
@@ -226,7 +226,7 @@ fi
 if [ -n "$APPIMAGE_SOURCE" ]; then
     APP_NEXT_STEP="The AppImage is installed; no separate application copy is needed."
 else
-    APP_NEXT_STEP="Install the AppImage at $APP_PATH before rebooting."
+    APP_NEXT_STEP="The service updater will install the latest AppImage when the service starts."
 fi
 
 cat <<EOF

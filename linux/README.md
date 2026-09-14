@@ -24,9 +24,14 @@ the dconf locks both need a fresh session.
 
 The AppImage is installed at the stable path
 `/opt/ofresh/kiosk-app/OfreshKioskApp.AppImage`. That directory is owned by the
-kiosk user because Electron's AppImage updater replaces the running file in
-place. The rest of the stack remains root-managed, including the systemd units,
-machine configuration, udev rules, and privileged recovery service.
+kiosk user. Before each service start, `ofresh-update` checks the configured
+GitHub release feed and atomically installs a checksum-verified AppImage when it
+has changed. This also provisions an empty installation and permits the fridge
+version line to start at `0.1.0` after legacy `1.x` builds. Set a fine-grained
+read-only `OFRESH_UPDATE_TOKEN` in `/etc/ofresh/kiosk.env` because the fridge
+repository is private. The rest of the stack remains root-managed, including
+the systemd units, machine configuration, udev rules, and privileged recovery
+service.
 
 Removal: `sudo ./uninstall.sh` (add `--purge` to drop config, state and logs).
 
@@ -34,7 +39,7 @@ Removal: `sudo ./uninstall.sh` (add `--purge` to drop config, state and logs).
 
 | Unit | Scope | Job |
 |---|---|---|
-| `ofresh-kiosk.service` | user | The app. `Restart=always`, `RestartSec=5`, `StartLimitIntervalSec=0`. |
+| `ofresh-kiosk.service` | user | Updates, then starts the app. `Restart=always`, `RestartSec=5`, `StartLimitIntervalSec=0`. |
 | `ofresh-kiosk-liveness.timer` | user, 60 s | Restarts the app when its log goes stale — the hung-but-alive case. |
 | `ofresh-kiosk-recovery.timer` | **system**, 30 s | Consumes the reboot request and reboots the computer. |
 
@@ -76,7 +81,7 @@ ship ready for this; it is a config flip, not a rewrite.
 | `while ($true) { Start-App }` | `Restart=always` |
 | `main.log` last line older than 3 min | log mtime, then `WatchdogSec` |
 | `Test-Connection 8.8.8.8` in the loop | nothing — restarts never wait on the network |
-| `Invoke-WebRequest` of a pinned release | AppImage updater + systemd restart |
+| `Invoke-WebRequest` of a pinned release | Checksum-verified systemd pre-start updater |
 | `SendKeys("{SCROLLLOCK}")` | dconf `idle-delay=0` + masked sleep targets |
 | `powercfg /change standby-timeout-*` | `systemctl mask sleep.target …` |
 | `AllowEdgeSwipe=0` | dconf lockdown profile with locks |
@@ -125,5 +130,6 @@ journalctl -u ofresh-kiosk-recovery           # computer reboot requests
 - **`main.log`'s Linux path is a guess.** `/var/log/ofresh/main.log` is a
   proposal; the app decides, and it is one variable in `kiosk.env` when it does.
 - **No integration with the Ubuntu autoinstall** in `ofresh-kiosk` PR #21 yet.
-- **Application packaging is out of scope.** The installer accepts an AppImage
-  produced by the app repo and places it at the stable update path.
+- **Private releases require a token.** Provision a fine-grained read-only
+  `OFRESH_UPDATE_TOKEN`; an authenticated `gh` CLI is only a development
+  fallback.
