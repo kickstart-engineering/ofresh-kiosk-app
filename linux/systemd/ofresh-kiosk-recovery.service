@@ -1,0 +1,21 @@
+# Privileged recovery. SYSTEM unit, runs as root.
+#
+# This is the Linux half of the error-31 escalation ladder, and the counterpart
+# to Invoke-RebootIfRequested in ensure_app_running.ps1 (PR #1). It consumes the
+# reboot-request signal the app drops when in-app USB re-enumeration cannot
+# clear the fault. USB port recovery stays in the application; this unit only
+# reboots the computer.
+#
+# Because this runs as root, the kiosk user needs no reboot privilege of its
+# own: no polkit rule, no sudoers entry, nothing equivalent to the EnableLUA=0
+# that setup_startup.bat applies on Windows.
+
+[Unit]
+Description=OFresh kiosk computer reboot recovery
+Documentation=https://github.com/kickstart-engineering/ofresh-kiosk-app
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/ofresh/kiosk.env
+ExecStart=/opt/ofresh/bin/ofresh-recovery
+SyslogIdentifier=ofresh-recovery

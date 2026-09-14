@@ -1,0 +1,16 @@
+# Runs the liveness check once a minute. The Windows loop used 120s; 60s here
+# because a restart is cheap when it is `systemctl restart` rather than a
+# process launch that might race a hung instance.
+
+[Unit]
+Description=Periodic OFresh kiosk liveness check
+Documentation=https://github.com/kickstart-engineering/ofresh-kiosk-app
+
+[Timer]
+# Give the session time to come up before the first check.
+OnBootSec=2min
+OnUnitActiveSec=60s
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

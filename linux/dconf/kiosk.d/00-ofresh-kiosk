@@ -1,0 +1,50 @@
+# GNOME lockdown for the kiosk session.
+#
+# This is the cost of running the app on a full Ubuntu Desktop rather than a
+# single-client compositor: the desktop has escape hatches that have to be
+# closed one at a time. Between them these settings replace the Windows
+# registry edits (AllowEdgeSwipe) and the powercfg timeouts, and remove the
+# need for the SendKeys("{SCROLLLOCK}") trick that keeps the machine awake by
+# faking keyboard input every two minutes.
+#
+# Paired with locks/00-ofresh-kiosk, which makes them un-settable from inside
+# the session.
+
+# Never blank, dim, or suspend. A kiosk display is the product.
+[org/gnome/desktop/session]
+idle-delay=uint32 0
+
+[org/gnome/desktop/screensaver]
+lock-enabled=false
+idle-activation-enabled=false
+
+[org/gnome/settings-daemon/plugins/power]
+sleep-inactive-ac-type='nothing'
+sleep-inactive-battery-type='nothing'
+idle-dim=false
+power-button-action='nothing'
+
+# Ways out of the application.
+[org/gnome/desktop/interface]
+enable-hot-corners=false
+
+[org/gnome/mutter]
+overlay-key=''
+edge-tiling=false
+
+[org/gnome/shell]
+disable-user-extensions=true
+
+# The on-screen keyboard pops over the app's own input on a touchscreen.
+[org/gnome/desktop/a11y/applications]
+screen-keyboard-enabled=false
+
+# Notification banners cover the UI and leak system state to customers.
+[org/gnome/desktop/notifications]
+show-banners=false
+show-in-lock-screen=false
+
+# Nothing here should prompt a customer about updates or media.
+[org/gnome/desktop/media-handling]
+automount-open=false
+autorun-never=true

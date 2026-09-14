@@ -1,0 +1,39 @@
+# Stable names for the kiosk's USB-serial adapters.
+#
+# Never open /dev/ttyUSB0 directly. The MDB interface and the door-lock
+# microcontroller are both USB-serial adapters, so their ttyUSB numbers are
+# assigned in enumeration order and swap depending on which one the kernel sees
+# first at boot. A symlink pinned to the device is stable across reboots and
+# replugs.
+#
+# GROUP="dialout" replaces the Windows approach of running everything elevated:
+# the kiosk user is added to dialout at install time and needs no other
+# privilege to talk to the hardware.
+
+ACTION=="add|change", SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", SYMLINK+="ofresh-mdb", GROUP="dialout", MODE="0660"
+
+# The fridge relay on the reference Linux kiosk uses a CP2102 with a stable
+# serial number, so it can keep its name even when moved to another USB socket.
+ACTION=="add|change", SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", ATTRS{serial}=="0001", SYMLINK+="ofresh-lock", GROUP="dialout", MODE="0660"
+
+# IF BOTH ADAPTERS ARE 1a86:7523 -- which is likely, since CH340 clones are
+# what both the MDB board and the Arduino Nano from ofresh-kiosk PR #7 use --
+# then the rule above matches both and /dev/ofresh-mdb lands on whichever
+# enumerated last. That is a coin flip on every boot.
+#
+# Fix it by pinning each device. On a kiosk with both plugged in, run:
+#
+#     udevadm info --name=/dev/ttyUSB0 --attribute-walk | grep -E 'serial|KERNELS'
+#
+# If the adapters report distinct serial numbers, prefer those -- they survive
+# being moved to a different USB port:
+#
+#ACTION=="add|change", SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", ATTRS{serial}=="<mdb-serial>", SYMLINK+="ofresh-mdb", GROUP="dialout", MODE="0660"
+#ACTION=="add|change", SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", ATTRS{serial}=="<lock-serial>", SYMLINK+="ofresh-lock", GROUP="dialout", MODE="0660"
+#
+# Cheap CH340s often ship with no serial number at all. Then pin by physical
+# port instead, and label the sockets on the machine, because moving a plug now
+# swaps the devices:
+#
+#ACTION=="add|change", SUBSYSTEM=="tty", KERNELS=="1-1.2", SYMLINK+="ofresh-mdb", GROUP="dialout", MODE="0660"
+#ACTION=="add|change", SUBSYSTEM=="tty", KERNELS=="1-1.3", SYMLINK+="ofresh-lock", GROUP="dialout", MODE="0660"

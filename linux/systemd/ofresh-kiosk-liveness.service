@@ -1,0 +1,15 @@
+# Fallback liveness check, driven by ofresh-kiosk-liveness.timer.
+#
+# Detects the "hung but alive" case that Restart=always cannot see, by the same
+# signal the Windows watchdog uses: staleness of the application's own log.
+# Runs as the kiosk user so it can drive `systemctl --user`.
+
+[Unit]
+Description=Restart the OFresh kiosk app when its log goes stale
+Documentation=https://github.com/kickstart-engineering/ofresh-kiosk-app
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/ofresh/kiosk.env
+ExecStart=/opt/ofresh/bin/ofresh-liveness
+SyslogIdentifier=ofresh-liveness

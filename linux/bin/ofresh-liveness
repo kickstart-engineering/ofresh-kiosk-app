@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+#
+# Restart the kiosk app when it is hung rather than crashed.
+#
+# Restart=always in ofresh-kiosk.service handles a crash: the process exits and
+# systemd starts it again. It cannot see an app that is still running but has
+# stopped doing anything. That is what this checks, using the same signal the
+# Windows watchdog uses -- staleness of the app's own log.
+#
+# Runs as the kiosk user, from ofresh-kiosk-liveness.timer. Output goes to the
+# journal (journalctl --user -u ofresh-kiosk-liveness).
+
+set -euo pipefail
+
+UNIT="${OFRESH_APP_UNIT:-ofresh-kiosk.service}"
+MAIN_LOG="${OFRESH_MAIN_LOG:-/var/log/ofresh/main.log}"
+STALE_SECONDS="${OFRESH_LOG_STALE_SECONDS:-180}"
+GRACE_SECONDS="${OFRESH_START_GRACE_SECONDS:-300}"
+ENABLED="${OFRESH_LIVENESS_ENABLED:-1}"
+
+log() { printf '%s\n' "$*"; }
+
+if [ "$ENABLED" != "1" ]; then
+    log "Liveness check disabled (OFRESH_LIVENESS_ENABLED=$ENABLED); systemd's own watchdog is expected to cover this"
+    exit 0
+fi
+
+# A stopped or failed unit is not our problem: Restart=always is already on it,
+# and restarting here would fight systemd's backoff.
+if ! systemctl --user is-active --quiet "$UNIT"; then
+    log "$UNIT is not active; leaving it to systemd's restart policy"
+    exit 0
+fi
+
+now_epoch="$(date +%s)"
+
+if [ -e "$MAIN_LOG" ]; then
+    log_mtime="$(stat -c %Y "$MAIN_LOG")"
+    log_age=$(( now_epoch - log_mtime ))
+else
+    # Missing log is treated as stale, matching Is-Main-Log-Stale on Windows.
+    log_age=""
+fi
+
+if [ -n "$log_age" ] && [ "$log_age" -le "$STALE_SECONDS" ]; then
+    log "Main log is ${log_age}s old, under the ${STALE_SECONDS}s threshold; nothing to do"
+    exit 0
+fi
+
+if [ -z "$log_age" ]; then
+    log "Main log $MAIN_LOG does not exist; treating as stale"
+else
+    log "Main log is ${log_age}s old, over the ${STALE_SECONDS}s threshold"
+fi
+
+# The app is running but silent. Before killing it, check we did not just start
+# it ourselves -- a fresh instance has not written its first log line yet.
+#
+# Monotonic timestamps, so a clock step (NTP catching up after a boot with no
+# RTC battery, which kiosks manage regularly) cannot make the grace period look
+# infinitely long and wedge us here forever.
+active_us="$(systemctl --user show "$UNIT" --property=ActiveEnterTimestampMonotonic --value)"
+
+if [ -n "$active_us" ] && [ "$active_us" != "0" ]; then
+    now_us="$(awk '{printf "%d", $1 * 1000000}' /proc/uptime)"
+    active_age=$(( (now_us - active_us) / 1000000 ))
+
+    if [ "$active_age" -lt "$GRACE_SECONDS" ]; then
+        log "$UNIT started ${active_age}s ago, inside the ${GRACE_SECONDS}s grace period; waiting for it to log"
+        exit 0
+    fi
+
+    log "$UNIT has been up ${active_age}s without logging"
+fi
+
+log "Restarting $UNIT"
+
+# systemctl restart is atomic: it stops the hung instance and waits for it to
+# go away before starting the new one. This is the whole reason the port is
+# safer than the Windows original, which launched a second instance alongside
+# the first and let both fight over the serial port.
+if systemctl --user restart "$UNIT"; then
+    log "Restarted $UNIT"
+else
+    log "Failed to restart $UNIT"
+    exit 1
+fi
