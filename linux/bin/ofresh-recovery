@@ -3,8 +3,9 @@
 # Consume the app's reboot-request signal and act on it.
 #
 # The Linux counterpart to Invoke-RebootIfRequested in ensure_app_running.ps1.
-# Same protocol, same freshness and rate-limit guarantees, one extra step: try
-# a USB rebind first and only reboot if that fails to bring the device back.
+# Same protocol and the same freshness and rate-limit guarantees. USB port
+# recovery remains the application's responsibility; this helper only reboots
+# the computer.
 #
 # Runs as root, from ofresh-kiosk-recovery.timer. Because this unit is the only
 # thing that reboots the machine, the kiosk user needs no reboot privilege of
@@ -17,10 +18,8 @@ REQUEST="${OFRESH_REBOOT_REQUEST:-/run/ofresh/reboot-request.json}"
 STATE_DIR="${OFRESH_STATE_DIR:-/var/lib/ofresh}"
 MAX_AGE="${OFRESH_REBOOT_REQUEST_MAX_AGE_SECONDS:-300}"
 MIN_BETWEEN="${OFRESH_MIN_SECONDS_BETWEEN_REBOOTS:-900}"
-USB_RECOVER_ENABLED="${OFRESH_USB_RECOVER_ENABLED:-1}"
 
 LAST_REBOOT_FILE="$STATE_DIR/last-reboot"
-USB_RECOVER_BIN=/opt/ofresh/bin/ofresh-usb-recover
 
 log() { printf '%s\n' "$*"; }
 
@@ -69,20 +68,7 @@ if [ -s "$LAST_REBOOT_FILE" ]; then
     fi
 fi
 
-# Rung 3: try to fix the bus without costing a boot cycle.
-if [ "$USB_RECOVER_ENABLED" = "1" ] && [ -x "$USB_RECOVER_BIN" ]; then
-    log "Attempting USB recovery before falling back to a reboot"
-
-    if "$USB_RECOVER_BIN"; then
-        log "USB recovery succeeded; no reboot needed"
-        rm -f "$REQUEST"
-        exit 0
-    fi
-
-    log "USB recovery did not bring the device back"
-fi
-
-# Rung 4: reboot. Record the time BEFORE rebooting -- if we recorded it after,
+# Reboot. Record the time BEFORE rebooting -- if we recorded it after,
 # we would never get there, and the rate limit would never engage.
 log "Rebooting"
 mkdir -p "$STATE_DIR"

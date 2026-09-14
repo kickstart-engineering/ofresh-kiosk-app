@@ -18,7 +18,6 @@ jobs:
             linux/install.sh \
             linux/uninstall.sh \
             linux/bin/ofresh-liveness \
-            linux/bin/ofresh-usb-recover \
             linux/bin/ofresh-recovery
 
   systemd:
@@ -33,7 +32,7 @@ jobs:
       - name: Stage referenced paths
         run: |
           sudo install -d /opt/ofresh/bin /opt/ofresh/kiosk-app /etc/ofresh
-          sudo install -m 0755 linux/bin/ofresh-liveness linux/bin/ofresh-usb-recover linux/bin/ofresh-recovery /opt/ofresh/bin/
+          sudo install -m 0755 linux/bin/ofresh-liveness linux/bin/ofresh-recovery /opt/ofresh/bin/
           printf '#!/bin/sh\nexit 0\n' | sudo tee /opt/ofresh/kiosk-app/ofresh-kiosk-app > /dev/null
           sudo chmod +x /opt/ofresh/kiosk-app/ofresh-kiosk-app
           sudo install -m 0644 linux/config/kiosk.env.template /etc/ofresh/kiosk.env

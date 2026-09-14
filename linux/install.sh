@@ -100,9 +100,12 @@ fi
 # --- Executables and units ---------------------------------------------------
 
 info "Installing helper scripts to $PREFIX/bin"
-for script in ofresh-liveness ofresh-usb-recover ofresh-recovery; do
+for script in ofresh-liveness ofresh-recovery; do
     run install -m 0755 "$SRC_DIR/bin/$script" "$PREFIX/bin/$script"
 done
+# Remove the helper shipped by the initial Linux port. Port-level USB resets
+# are deliberately not part of this supervisor.
+run rm -f "$PREFIX/bin/ofresh-usb-recover"
 
 info "Installing systemd units"
 run install -m 0644 "$SRC_DIR/systemd/ofresh-kiosk.service"           /etc/systemd/user/ofresh-kiosk.service

@@ -25,8 +25,7 @@ Run `setup_startup.bat` as Administrator and pick option 5 for a full install.
 ## Linux
 
 Files under [`linux/`](linux/), targeting Ubuntu Desktop. Systemd replaces the
-PowerShell supervision loop, and adds two recovery steps between "restart the
-app" and "reboot the machine" that the Windows watchdog does not have.
+PowerShell supervision loop and handles computer reboot requests.
 
 ```sh
 sudo linux/install.sh --user ofresh --autologin

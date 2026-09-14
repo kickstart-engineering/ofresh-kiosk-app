@@ -31,7 +31,7 @@ Removal: `sudo ./uninstall.sh` (add `--purge` to drop config, state and logs).
 |---|---|---|
 | `ofresh-kiosk.service` | user | The app. `Restart=always`, `RestartSec=5`, `StartLimitIntervalSec=0`. |
 | `ofresh-kiosk-liveness.timer` | user, 60 s | Restarts the app when its log goes stale — the hung-but-alive case. |
-| `ofresh-kiosk-recovery.timer` | **system**, 30 s | Consumes the reboot request, rebinds USB, reboots as a last resort. |
+| `ofresh-kiosk-recovery.timer` | **system**, 30 s | Consumes the reboot request and reboots the computer. |
 
 Only the recovery unit is privileged. Because it runs as root, the kiosk user
 needs no reboot right of its own: no polkit rule, no sudoers entry, and nothing
@@ -39,14 +39,14 @@ resembling the machine-wide `EnableLUA=0` the Windows installer applies.
 
 ## The escalation ladder
 
-Windows has two rungs. Linux has four, and the two new ones in the middle are
-the point of the exercise:
+The recovery sequence is intentionally limited to application supervision and
+computer reboot. USB port resets remain the application's responsibility:
 
 1. The app re-enumerates USB internally (`ofresh-kiosk` PR #9).
 2. **`systemctl restart`** — atomic, ~5 s. Cannot produce two instances fighting
    over the serial port, which the Windows script could (see PR #2).
-3. **USB unbind/rebind through sysfs** — ~5 s, no boot cycle.
-4. Reboot, rate-limited to once per 15 minutes, stamped in `/var/lib/ofresh`.
+3. Reboot the computer, rate-limited to once per 15 minutes and stamped in
+   `/var/lib/ofresh`.
 
 ## Liveness, in two phases
 
@@ -108,7 +108,7 @@ port — `linux/udev/99-ofresh-serial.rules` carries both recipes and the
 ```sh
 journalctl --user -u ofresh-kiosk -f          # the app
 journalctl --user -u ofresh-kiosk-liveness    # restart decisions
-journalctl -u ofresh-kiosk-recovery           # USB rebinds and reboots
+journalctl -u ofresh-kiosk-recovery           # computer reboot requests
 ```
 
 ## Known gaps
