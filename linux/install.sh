@@ -15,12 +15,14 @@
 #     no credentials on disk, rather than writing one into the registry.
 #
 # Usage:
-#   sudo ./install.sh [--user NAME] [--app-path PATH] [--autologin] [--dry-run]
+#   sudo ./install.sh [--user NAME] [--appimage PATH] [--app-path PATH] [--autologin] [--dry-run]
 
 set -euo pipefail
 
 KIOSK_USER=ofresh
-APP_PATH=/opt/ofresh/kiosk-app/ofresh-kiosk-app
+APP_PATH=/opt/ofresh/kiosk-app/OfreshKioskApp.AppImage
+APP_PATH_EXPLICIT=0
+APPIMAGE_SOURCE=
 CONFIGURE_AUTOLOGIN=0
 DRY_RUN=0
 
@@ -44,8 +46,9 @@ Install the OFresh kiosk stack on Ubuntu Desktop.
 Usage: sudo ./install.sh [OPTIONS]
 
   --user NAME       Kiosk user account (default: ofresh)
+  --appimage PATH   Install this AppImage at the stable self-updating path
   --app-path PATH   Application executable
-                    (default: /opt/ofresh/kiosk-app/ofresh-kiosk-app)
+                    (default: /opt/ofresh/kiosk-app/OfreshKioskApp.AppImage)
   --autologin       Configure gdm autologin for the kiosk user
   --dry-run         Print what would happen, change nothing
   -h, --help        Show this message
@@ -59,7 +62,8 @@ EOF
 while [ $# -gt 0 ]; do
     case "$1" in
         --user)      KIOSK_USER="${2:?--user needs a value}"; shift 2 ;;
-        --app-path)  APP_PATH="${2:?--app-path needs a value}"; shift 2 ;;
+        --appimage)  APPIMAGE_SOURCE="${2:?--appimage needs a value}"; shift 2 ;;
+        --app-path)  APP_PATH="${2:?--app-path needs a value}"; APP_PATH_EXPLICIT=1; shift 2 ;;
         --autologin) CONFIGURE_AUTOLOGIN=1; shift ;;
         --dry-run)   DRY_RUN=1; shift ;;
         -h|--help)   usage ;;
@@ -70,6 +74,13 @@ done
 [ "$(id -u)" -eq 0 ] || die "Must run as root"
 id "$KIOSK_USER" >/dev/null 2>&1 || die "User '$KIOSK_USER' does not exist. Create it first, or pass --user."
 
+if [ -n "$APPIMAGE_SOURCE" ] && [ ! -f "$APPIMAGE_SOURCE" ]; then
+    die "AppImage not found: $APPIMAGE_SOURCE"
+fi
+if [ -n "$APPIMAGE_SOURCE" ] && [ "$APP_PATH_EXPLICIT" = 1 ]; then
+    die "--appimage uses the stable self-updating path and cannot be combined with --app-path"
+fi
+
 KIOSK_GROUP="$(id -gn "$KIOSK_USER")"
 
 info "Installing OFresh kiosk stack ${VERSION} for user '${KIOSK_USER}'"
@@ -78,6 +89,7 @@ info "Installing OFresh kiosk stack ${VERSION} for user '${KIOSK_USER}'"
 
 info "Creating directories"
 run install -d -m 0755 "$PREFIX/bin"
+run install -d -m 0750 -o "$KIOSK_USER" -g "$KIOSK_GROUP" "$PREFIX/kiosk-app"
 run install -d -m 0755 "$CONF_DIR"
 run install -d -m 0750 -o root -g "$KIOSK_GROUP" "$STATE_DIR"
 run install -d -m 0755 -o "$KIOSK_USER" -g "$KIOSK_GROUP" "$LOG_DIR"
@@ -103,6 +115,15 @@ info "Installing helper scripts to $PREFIX/bin"
 for script in ofresh-liveness ofresh-recovery; do
     run install -m 0755 "$SRC_DIR/bin/$script" "$PREFIX/bin/$script"
 done
+
+# Electron's AppImage updater unlinks the running image and moves the downloaded
+# replacement into this same directory. Both the stable file and its containing
+# directory therefore belong to the unprivileged kiosk user. No sudo or polkit
+# permission is granted to the application.
+if [ -n "$APPIMAGE_SOURCE" ]; then
+    info "Installing AppImage at $APP_PATH"
+    run install -m 0755 -o "$KIOSK_USER" -g "$KIOSK_GROUP" "$APPIMAGE_SOURCE" "$APP_PATH"
+fi
 # Remove the helper shipped by the initial Linux port. Port-level USB resets
 # are deliberately not part of this supervisor.
 run rm -f "$PREFIX/bin/ofresh-usb-recover"
@@ -116,7 +137,7 @@ run install -m 0644 "$SRC_DIR/systemd/ofresh-kiosk-recovery.timer"    /etc/syste
 
 # The unit ships with the default app path; rewrite it only if asked for
 # something else, so re-running the installer does not churn the file.
-if [ "$APP_PATH" != /opt/ofresh/kiosk-app/ofresh-kiosk-app ]; then
+if [ "$APP_PATH" != /opt/ofresh/kiosk-app/OfreshKioskApp.AppImage ]; then
     info "Pointing ofresh-kiosk.service at $APP_PATH"
     run sed -i "s|^ExecStart=.*|ExecStart=$APP_PATH|" /etc/systemd/user/ofresh-kiosk.service
 fi
@@ -202,6 +223,12 @@ else
     printf '%s\n' "$VERSION" > "$PREFIX/VERSION"
 fi
 
+if [ -n "$APPIMAGE_SOURCE" ]; then
+    APP_NEXT_STEP="The AppImage is installed; no separate application copy is needed."
+else
+    APP_NEXT_STEP="Install the AppImage at $APP_PATH before rebooting."
+fi
+
 cat <<EOF
 
 $(info "Done")
@@ -214,7 +241,7 @@ $(info "Done")
 Next steps:
 
   1. Fill in $CONF_FILE (MACHINE_ID, KIOSK_SERVICE_HOST, credentials).
-  2. Install the application itself at $APP_PATH.
+  2. $APP_NEXT_STEP
   3. Reboot. The group change and the dconf locks both need a fresh session.
 
 After rebooting, check on it with:

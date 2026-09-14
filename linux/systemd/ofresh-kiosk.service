@@ -22,7 +22,8 @@ StartLimitIntervalSec=0
 [Service]
 Type=simple
 EnvironmentFile=/etc/ofresh/kiosk.env
-ExecStart=/opt/ofresh/kiosk-app/ofresh-kiosk-app
+Environment=KIOSK_APP_ENV_FILE=/etc/ofresh/kiosk.env
+ExecStart=/opt/ofresh/kiosk-app/OfreshKioskApp.AppImage
 Restart=always
 RestartSec=5
 SyslogIdentifier=ofresh-kiosk

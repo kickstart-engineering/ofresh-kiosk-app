@@ -12,16 +12,21 @@ enough to read in one sitting.
 ## Install
 
 ```sh
-sudo ./install.sh --user ofresh --autologin
+sudo ./install.sh --user ofresh --appimage /path/to/OfreshKioskApp.AppImage --autologin
 ```
 
 Re-running is safe and is the supported way to upgrade. An existing
 `/etc/ofresh/kiosk.env` is never overwritten. `--dry-run` prints every action
 without taking any.
 
-Then fill in `/etc/ofresh/kiosk.env`, install the application at
-`/opt/ofresh/kiosk-app/`, and reboot — the `dialout` group change and the dconf
-locks both need a fresh session.
+Then fill in `/etc/ofresh/kiosk.env` and reboot — the `dialout` group change and
+the dconf locks both need a fresh session.
+
+The AppImage is installed at the stable path
+`/opt/ofresh/kiosk-app/OfreshKioskApp.AppImage`. That directory is owned by the
+kiosk user because Electron's AppImage updater replaces the running file in
+place. The rest of the stack remains root-managed, including the systemd units,
+machine configuration, udev rules, and privileged recovery service.
 
 Removal: `sudo ./uninstall.sh` (add `--purge` to drop config, state and logs).
 
@@ -71,7 +76,7 @@ ship ready for this; it is a config flip, not a rewrite.
 | `while ($true) { Start-App }` | `Restart=always` |
 | `main.log` last line older than 3 min | log mtime, then `WatchdogSec` |
 | `Test-Connection 8.8.8.8` in the loop | nothing — restarts never wait on the network |
-| `Invoke-WebRequest` of a pinned release | packaged app under `/opt/ofresh` |
+| `Invoke-WebRequest` of a pinned release | AppImage updater + systemd restart |
 | `SendKeys("{SCROLLLOCK}")` | dconf `idle-delay=0` + masked sleep targets |
 | `powercfg /change standby-timeout-*` | `systemctl mask sleep.target …` |
 | `AllowEdgeSwipe=0` | dconf lockdown profile with locks |
@@ -120,5 +125,5 @@ journalctl -u ofresh-kiosk-recovery           # computer reboot requests
 - **`main.log`'s Linux path is a guess.** `/var/log/ofresh/main.log` is a
   proposal; the app decides, and it is one variable in `kiosk.env` when it does.
 - **No integration with the Ubuntu autoinstall** in `ofresh-kiosk` PR #21 yet.
-- **Application packaging is out of scope.** These units expect something
-  executable at `/opt/ofresh/kiosk-app/`; producing it is the app repo's job.
+- **Application packaging is out of scope.** The installer accepts an AppImage
+  produced by the app repo and places it at the stable update path.

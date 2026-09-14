@@ -28,7 +28,7 @@ Files under [`linux/`](linux/), targeting Ubuntu Desktop. Systemd replaces the
 PowerShell supervision loop and handles computer reboot requests.
 
 ```sh
-sudo linux/install.sh --user ofresh --autologin
+sudo linux/install.sh --user ofresh --appimage /path/to/OfreshKioskApp.AppImage --autologin
 ```
 
 See [`linux/README.md`](linux/README.md) for the architecture, the mapping from
