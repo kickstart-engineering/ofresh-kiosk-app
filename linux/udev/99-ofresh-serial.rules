@@ -12,6 +12,10 @@
 
 ACTION=="add|change", SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", SYMLINK+="ofresh-mdb", GROUP="dialout", MODE="0660"
 
+# The fridge relay on the reference Linux kiosk uses a CP2102 with a stable
+# serial number, so it can keep its name even when moved to another USB socket.
+ACTION=="add|change", SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", ATTRS{serial}=="0001", SYMLINK+="ofresh-lock", GROUP="dialout", MODE="0660"
+
 # IF BOTH ADAPTERS ARE 1a86:7523 -- which is likely, since CH340 clones are
 # what both the MDB board and the Arduino Nano from ofresh-kiosk PR #7 use --
 # then the rule above matches both and /dev/ofresh-mdb lands on whichever
