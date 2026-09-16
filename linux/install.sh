@@ -130,6 +130,8 @@ run rm -f "$PREFIX/bin/ofresh-usb-recover"
 
 info "Installing systemd units"
 run install -m 0644 "$SRC_DIR/systemd/ofresh-kiosk.service"           /etc/systemd/user/ofresh-kiosk.service
+run install -m 0644 "$SRC_DIR/systemd/ofresh-kiosk-update.service"    /etc/systemd/user/ofresh-kiosk-update.service
+run install -m 0644 "$SRC_DIR/systemd/ofresh-kiosk-update.timer"      /etc/systemd/user/ofresh-kiosk-update.timer
 run install -m 0644 "$SRC_DIR/systemd/ofresh-kiosk-liveness.service"  /etc/systemd/user/ofresh-kiosk-liveness.service
 run install -m 0644 "$SRC_DIR/systemd/ofresh-kiosk-liveness.timer"    /etc/systemd/user/ofresh-kiosk-liveness.timer
 run install -m 0644 "$SRC_DIR/systemd/ofresh-kiosk-recovery.service"  /etc/systemd/system/ofresh-kiosk-recovery.service
@@ -213,7 +215,9 @@ run systemctl daemon-reload
 # --global enables the user units for every user on the machine. On a
 # single-purpose kiosk that is what we want, and it avoids having to reach into
 # the kiosk user's session from this script.
-run systemctl --global enable ofresh-kiosk.service ofresh-kiosk-liveness.timer
+run systemctl --global enable ofresh-kiosk.service \
+                               ofresh-kiosk-update.timer \
+                               ofresh-kiosk-liveness.timer
 run systemctl enable --now ofresh-kiosk-recovery.timer
 
 run install -d -m 0755 "$PREFIX"

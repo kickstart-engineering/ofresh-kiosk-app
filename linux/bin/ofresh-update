@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import argparse
 import base64
+import fcntl
 import hashlib
 import json
 import os
@@ -83,18 +85,43 @@ def fail(message: str) -> int:
     return 1
 
 
-def main() -> int:
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Install the latest configured OFresh AppImage release."
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="ignore the update-check interval",
+    )
+    parser.add_argument(
+        "--restart-service",
+        metavar="UNIT",
+        help="restart this user service after installing an update",
+    )
+    return parser.parse_args()
+
+
+def restart_service(unit: str) -> None:
+    subprocess.run(
+        ["systemctl", "--user", "restart", unit],
+        check=True,
+    )
+    log(f"Restarted {unit} to activate the update")
+
+
+def install_update(force: bool) -> tuple[int, bool]:
     if os.environ.get("OFRESH_UPDATE_ENABLED", "1") != "1":
         if APP_PATH.is_file():
             log("External AppImage updater is disabled")
-            return 0
-        return fail("OFRESH_UPDATE_ENABLED is not 1")
+            return 0, False
+        return fail("OFRESH_UPDATE_ENABLED is not 1"), False
 
-    if APP_PATH.is_file() and STAMP_PATH.is_file():
+    if not force and APP_PATH.is_file() and STAMP_PATH.is_file():
         age = time.time() - STAMP_PATH.stat().st_mtime
         if age < CHECK_INTERVAL:
             log(f"Skipping update check; last check was {int(age)}s ago")
-            return 0
+            return 0, False
 
     access_token = token()
     api_url = f"https://api.github.com/repos/{REPOSITORY}/releases?per_page=100"
@@ -112,7 +139,7 @@ def main() -> int:
             if match and not release.get("draft") and not release.get("prerelease"):
                 candidates.append((tuple(map(int, match.groups())), release))
         if not candidates:
-            return fail(f"no {TAG_PREFIX}* release exists in {REPOSITORY}")
+            return fail(f"no {TAG_PREFIX}* release exists in {REPOSITORY}"), False
 
         _, release = max(candidates, key=lambda candidate: candidate[0])
         assets = {asset["name"]: asset for asset in release.get("assets", [])}
@@ -121,20 +148,20 @@ def main() -> int:
             asset for name, asset in assets.items() if name.endswith(".AppImage")
         ]
         if not metadata_asset or len(appimage_assets) != 1:
-            return fail("release must contain latest-linux.yml and one AppImage")
+            return fail("release must contain latest-linux.yml and one AppImage"), False
 
         metadata = github_bytes(
             metadata_asset["url"], access_token, "application/octet-stream"
         ).decode("utf-8")
         sha_match = re.search(r"^sha512:\s*(\S+)\s*$", metadata, re.MULTILINE)
         if not sha_match:
-            return fail("latest-linux.yml does not contain sha512")
+            return fail("latest-linux.yml does not contain sha512"), False
         expected_sha512 = sha_match.group(1)
 
         if installed_sha512() == expected_sha512:
             STAMP_PATH.touch()
             log(f"AppImage is current ({release['tag_name']})")
-            return 0
+            return 0, False
 
         APP_PATH.parent.mkdir(parents=True, exist_ok=True)
         temporary_path: Path | None = None
@@ -163,19 +190,55 @@ def main() -> int:
 
             actual_sha512 = base64.b64encode(digest.digest()).decode("ascii")
             if actual_sha512 != expected_sha512:
-                return fail("downloaded AppImage checksum does not match release metadata")
+                return (
+                    fail("downloaded AppImage checksum does not match release metadata"),
+                    False,
+                )
 
             temporary_path.chmod(0o755)
             os.replace(temporary_path, APP_PATH)
             temporary_path = None
             STAMP_PATH.touch()
             log(f"Installed {release['tag_name']} from {REPOSITORY}")
-            return 0
+            return 0, True
         finally:
             if temporary_path is not None:
                 temporary_path.unlink(missing_ok=True)
-    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError) as error:
+    except (
+        HTTPError,
+        URLError,
+        TimeoutError,
+        json.JSONDecodeError,
+        OSError,
+    ) as error:
+        return fail(str(error)), False
+
+
+def main() -> int:
+    args = parse_args()
+    try:
+        APP_PATH.parent.mkdir(parents=True, exist_ok=True)
+        lock_path = APP_PATH.parent / ".update.lock"
+        with lock_path.open("a", encoding="utf-8") as lock:
+            # The startup check and persistent timer can both fire when a kiosk
+            # boots after 03:00. Serialize them so they cannot download or
+            # replace the AppImage concurrently.
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            status, installed = install_update(args.force)
+    except OSError as error:
         return fail(str(error))
+
+    if status != 0 or not installed or not args.restart_service:
+        return status
+
+    try:
+        # The update lock is released before restarting. The kiosk service's
+        # ExecStartPre invokes this updater again and must not deadlock here.
+        restart_service(args.restart_service)
+    except (OSError, subprocess.CalledProcessError) as error:
+        log(f"Update installed but failed to restart {args.restart_service}: {error}")
+        return 1
+    return 0
 
 
 if __name__ == "__main__":

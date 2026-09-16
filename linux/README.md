@@ -33,6 +33,13 @@ repository is private. The rest of the stack remains root-managed, including
 the systemd units, machine configuration, udev rules, and privileged recovery
 service.
 
+`ofresh-kiosk-update.timer` also checks once a day at 03:00 local time. It is a
+persistent timer, so a kiosk that was powered off at 03:00 checks as soon as its
+user session next starts. The kiosk service is restarted only when a different
+AppImage was installed; an up-to-date or failed check does not interrupt it.
+The environment template sets `SKIP_AUTO_UPDATE=true`, making this external
+updater the single update owner for service-managed Linux installations.
+
 Removal: `sudo ./uninstall.sh` (add `--purge` to drop config, state and logs).
 
 ## What runs
@@ -40,6 +47,7 @@ Removal: `sudo ./uninstall.sh` (add `--purge` to drop config, state and logs).
 | Unit | Scope | Job |
 |---|---|---|
 | `ofresh-kiosk.service` | user | Updates, then starts the app. `Restart=always`, `RestartSec=5`, `StartLimitIntervalSec=0`. |
+| `ofresh-kiosk-update.timer` | user, daily at 03:00 | Installs a new AppImage and restarts the app only when it changed. Missed runs execute after the next startup. |
 | `ofresh-kiosk-liveness.timer` | user, 60 s | Restarts the app when its log goes stale — the hung-but-alive case. |
 | `ofresh-kiosk-recovery.timer` | **system**, 30 s | Consumes the reboot request and reboots the computer. |
 
@@ -117,6 +125,7 @@ port — `linux/udev/99-ofresh-serial.rules` carries both recipes and the
 
 ```sh
 journalctl --user -u ofresh-kiosk -f          # the app
+journalctl --user -u ofresh-kiosk-update      # daily update checks
 journalctl --user -u ofresh-kiosk-liveness    # restart decisions
 journalctl -u ofresh-kiosk-recovery           # computer reboot requests
 ```

@@ -55,10 +55,14 @@ info "Removing OFresh kiosk stack"
 
 info "Disabling units"
 run systemctl disable --now ofresh-kiosk-recovery.timer || warn "recovery timer was not enabled"
-run systemctl --global disable ofresh-kiosk.service ofresh-kiosk-liveness.timer || warn "user units were not enabled"
+run systemctl --global disable ofresh-kiosk.service \
+                                    ofresh-kiosk-update.timer \
+                                    ofresh-kiosk-liveness.timer || warn "user units were not enabled"
 
 info "Removing systemd units"
 run rm -f /etc/systemd/user/ofresh-kiosk.service \
+          /etc/systemd/user/ofresh-kiosk-update.service \
+          /etc/systemd/user/ofresh-kiosk-update.timer \
           /etc/systemd/user/ofresh-kiosk-liveness.service \
           /etc/systemd/user/ofresh-kiosk-liveness.timer \
           /etc/systemd/system/ofresh-kiosk-recovery.service \
