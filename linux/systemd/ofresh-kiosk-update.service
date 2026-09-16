@@ -1,0 +1,19 @@
+# Daily update check, driven by ofresh-kiosk-update.timer. This is separate
+# from the kiosk service so a healthy, continuously running kiosk still learns
+# about new releases. The updater restarts the app only after replacing its
+# AppImage; a no-update check leaves the running kiosk untouched.
+
+[Unit]
+Description=Install OFresh kiosk application updates
+Documentation=https://github.com/kickstart-engineering/ofresh-kiosk-app
+# On a catch-up run after boot, let the kiosk's own pre-start update check
+# finish first. This avoids immediately restarting a service that is still
+# activating; the updater also takes a file lock as a second line of defense.
+Wants=ofresh-kiosk.service
+After=ofresh-kiosk.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/ofresh/kiosk.env
+ExecStart=/opt/ofresh/bin/ofresh-update --restart-service ofresh-kiosk.service
+SyslogIdentifier=ofresh-update
