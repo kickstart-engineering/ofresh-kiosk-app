@@ -27,37 +27,21 @@ The app side of this signal lives in `ofresh-kiosk` →
 ## Updating an existing Windows kiosk
 
 `update_watchdog.ps1` replaces the watchdog without rerunning the full provisioning
-flow. Run it from an elevated Windows PowerShell 5.1 prompt.
+flow. Copy `update_watchdog.ps1` and the new `ensure_app_running.ps1` to the same local
+directory, then run the updater from an elevated Windows PowerShell 5.1 prompt.
 
-After this PR merges, download the updater, install the watchdog from `main`, and
-restart Windows:
-
-```powershell
-$updater = Join-Path $env:TEMP 'update_watchdog.ps1'
-Invoke-WebRequest `
-  -Uri 'https://github.com/kickstart-engineering/ofresh-kiosk-app/raw/refs/heads/main/update_watchdog.ps1' `
-  -OutFile $updater -UseBasicParsing
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File $updater -Restart
-```
-
-To test this PR before merge, download the updater from the PR branch and select the
-same branch as the watchdog source:
+The default source is `ensure_app_running.ps1` beside the updater:
 
 ```powershell
-$ref = 'claude/ofresh-kiosk-error-31-restart-xt3lpd'
-$updater = Join-Path $env:TEMP 'update_watchdog.ps1'
-Invoke-WebRequest `
-  -Uri "https://github.com/kickstart-engineering/ofresh-kiosk-app/raw/refs/heads/$ref/update_watchdog.ps1" `
-  -OutFile $updater -UseBasicParsing
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File $updater `
-  -GitRef claude/ofresh-kiosk-error-31-restart-xt3lpd -Restart
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File .\update_watchdog.ps1 -Restart
 ```
 
-For an offline machine, copy both scripts to removable storage and run:
+An explicit local path is also supported:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\update_watchdog.ps1 `
-  -SourcePath .\ensure_app_running.ps1 -Restart
+  -SourcePath D:\updates\ensure_app_running.ps1 -Restart
 ```
 
 The updater validates the replacement with the PowerShell parser, stores a timestamped

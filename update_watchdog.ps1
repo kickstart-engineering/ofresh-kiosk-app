@@ -6,32 +6,19 @@
     Replaces the installed OFresh watchdog and optionally restarts the computer.
 
 .DESCRIPTION
-    Downloads or copies ensure_app_running.ps1, validates it with the PowerShell
-    parser, keeps a timestamped backup, and atomically replaces the installed file.
+    Copies a local ensure_app_running.ps1, validates it with the PowerShell parser,
+    keeps a timestamped backup, and atomically replaces the installed file.
     Pass -Restart to reboot after installation so Winlogon starts the new watchdog.
 
 .EXAMPLE
     .\update_watchdog.ps1 -Restart
 
 .EXAMPLE
-    .\update_watchdog.ps1 -GitRef claude/ofresh-kiosk-error-31-restart-xt3lpd -Restart
-
-.EXAMPLE
     .\update_watchdog.ps1 -SourcePath D:\updates\ensure_app_running.ps1 -Restart
 #>
 
-[CmdletBinding(DefaultParameterSetName = 'GitHub')]
+[CmdletBinding()]
 param(
-    [Parameter(ParameterSetName = 'GitHub')]
-    [ValidateNotNullOrEmpty()]
-    [string]$GitRef = 'main',
-
-    [Parameter(Mandatory, ParameterSetName = 'Url')]
-    [ValidateNotNull()]
-    [uri]$SourceUrl,
-
-    [Parameter(Mandatory, ParameterSetName = 'File')]
-    [ValidateNotNullOrEmpty()]
     [string]$SourcePath,
 
     [ValidateNotNullOrEmpty()]
@@ -61,7 +48,7 @@ function Test-WatchdogScript {
     param([Parameter(Mandatory)][string]$Path)
 
     if ((Get-Item -Path $Path).Length -lt 1000) {
-        throw "Downloaded watchdog is unexpectedly small: $Path"
+        throw "Replacement watchdog is unexpectedly small: $Path"
     }
 
     $tokens = $null
@@ -76,7 +63,7 @@ function Test-WatchdogScript {
         $details = ($parseErrors | ForEach-Object {
             "line $($_.Extent.StartLineNumber): $($_.Message)"
         }) -join '; '
-        throw "Downloaded watchdog has PowerShell syntax errors: $details"
+        throw "Replacement watchdog has PowerShell syntax errors: $details"
     }
 
     $content = Get-Content -Path $Path -Raw
@@ -88,7 +75,7 @@ function Test-WatchdogScript {
 
     foreach ($text in $requiredText) {
         if (-not $content.Contains($text)) {
-            throw "Downloaded watchdog is missing required text: $text"
+            throw "Replacement watchdog is missing required text: $text"
         }
     }
 }
@@ -97,8 +84,17 @@ if ($env:OS -ne 'Windows_NT') {
     throw 'This updater only supports Windows.'
 }
 
+$SourcePath = if ([string]::IsNullOrWhiteSpace($SourcePath)) {
+    Join-Path $PSScriptRoot 'ensure_app_running.ps1'
+} else {
+    [System.IO.Path]::GetFullPath($SourcePath)
+}
 $TargetPath = [System.IO.Path]::GetFullPath($TargetPath)
 $TargetDirectory = Split-Path -Parent $TargetPath
+
+if (-not (Test-Path -Path $SourcePath -PathType Leaf)) {
+    throw "Replacement watchdog not found at $SourcePath"
+}
 
 if (-not (Test-Path -Path $TargetPath -PathType Leaf)) {
     throw "Installed watchdog not found at $TargetPath. Use setup_startup.bat for a new installation."
@@ -112,23 +108,9 @@ $replacementInstalled = $false
 $installationVerified = $false
 
 try {
-    switch ($PSCmdlet.ParameterSetName) {
-        'GitHub' {
-            $resolvedSource = "https://github.com/kickstart-engineering/ofresh-kiosk-app/raw/refs/heads/$GitRef/ensure_app_running.ps1"
-            Write-UpdateLog "Downloading watchdog from Git ref $GitRef"
-            Invoke-WebRequest -Uri $resolvedSource -OutFile $temporaryPath -UseBasicParsing
-        }
-        'Url' {
-            $resolvedSource = $SourceUrl.AbsoluteUri
-            Write-UpdateLog "Downloading watchdog from $resolvedSource"
-            Invoke-WebRequest -Uri $SourceUrl -OutFile $temporaryPath -UseBasicParsing
-        }
-        'File' {
-            $resolvedSource = (Resolve-Path -Path $SourcePath).Path
-            Write-UpdateLog "Copying watchdog from $resolvedSource"
-            Copy-Item -Path $resolvedSource -Destination $temporaryPath -Force
-        }
-    }
+    $resolvedSource = (Resolve-Path -Path $SourcePath).Path
+    Write-UpdateLog "Copying watchdog from $resolvedSource"
+    Copy-Item -Path $resolvedSource -Destination $temporaryPath -Force
 
     Test-WatchdogScript -Path $temporaryPath
 
