@@ -54,8 +54,8 @@ $AgentLogsFile = "$AgentLogsPath\ensure_app_running_agent.log"
 # picovend-mdb.ts -> maybeRequestReboot). The watchdog runs elevated, so it can do
 # the one thing that reliably re-enumerates a CH340 stuck off the bus: reboot the PC.
 $RebootRequestFile = "$AgentLogsPath\reboot-request.json"
-# Persists the last watchdog-initiated reboot time across boots so a permanently
-# dead device can't drive a reboot loop.
+# Persists the last watchdog-initiated reboot time across boots so repeated
+# requests cannot cause rapid reboots.
 $LastRebootMarker = "$AgentLogsPath\last-watchdog-reboot.txt"
 # Ignore requests older than this (stale file left by a crash or a prior boot).
 $RebootRequestMaxAgeMinutes = 5
@@ -197,10 +197,8 @@ function Is-Main-Log-Stale {
 }
 
 
-# Reboot the PC if the app asked us to via $RebootRequestFile. Validates the
-# request is fresh (not a leftover stale file) and rate-limits reboots so a
-# permanently faulty device cannot cause a reboot loop. Consumes the request and
-# records the reboot time before rebooting so we don't loop after coming back.
+# Reboot the PC if the app asked us to via $RebootRequestFile. Validate the
+# request, enforce the minimum interval, and consume it before restarting.
 function Invoke-RebootIfRequested {
     if (-not (Test-Path $RebootRequestFile)) {
         return
@@ -210,14 +208,29 @@ function Invoke-RebootIfRequested {
 
     $requestedAt = $null
     $reason = "(unspecified)"
+    $requestRaw = $null
     try {
-        $request = Get-Content -Path $RebootRequestFile -Raw | ConvertFrom-Json
+        $requestRaw = Get-Content -Path $RebootRequestFile -Raw -ErrorAction Stop
+        $request = $requestRaw | ConvertFrom-Json -ErrorAction Stop
         if ($request.requestedAt) { $requestedAt = [datetime]$request.requestedAt }
         if ($request.reason) { $reason = $request.reason }
     }
     catch {
-        Write-Log "Could not parse reboot request ($($_.Exception.Message)) - ignoring and removing"
-        Remove-Item -Path $RebootRequestFile -Force -ErrorAction SilentlyContinue
+        # The app writes this file while the watchdog polls it. A read can catch a
+        # partial write, so keep a recent malformed file and retry on the next pass.
+        $requestFile = Get-Item -Path $RebootRequestFile -ErrorAction SilentlyContinue
+        $fileAgeMinutes = if ($requestFile) {
+            ((Get-Date) - $requestFile.LastWriteTime).TotalMinutes
+        } else {
+            0
+        }
+
+        if ($requestFile -and $fileAgeMinutes -gt $RebootRequestMaxAgeMinutes) {
+            Write-Log "Could not parse stale reboot request ($($_.Exception.Message)) - removing"
+            Remove-Item -Path $RebootRequestFile -Force -ErrorAction SilentlyContinue
+        } else {
+            Write-Log "Could not parse recent reboot request ($($_.Exception.Message)) - will retry"
+        }
         return
     }
 
@@ -242,7 +255,7 @@ function Invoke-RebootIfRequested {
             $lastReboot = [datetime]((Get-Content -Path $LastRebootMarker -Raw).Trim())
             $sinceLast = ((Get-Date) - $lastReboot).TotalMinutes
             if ($sinceLast -lt $MinMinutesBetweenReboots) {
-                Write-Log "Reboot requested (reason: $reason) but last reboot was $([math]::Round($sinceLast,1)) min ago (< $MinMinutesBetweenReboots) - skipping to avoid a reboot loop"
+                Write-Log "Reboot requested (reason: $reason) but last reboot was $([math]::Round($sinceLast,1)) min ago (< $MinMinutesBetweenReboots) - waiting for the minimum interval"
                 return
             }
         }
@@ -254,14 +267,42 @@ function Invoke-RebootIfRequested {
 
     Write-Log "Reboot requested by app (reason: $reason, age $([math]::Round($ageMinutes,1)) min) - rebooting PC now"
 
-    # Consume the request and record the reboot so we don't loop after coming back.
-    Remove-Item -Path $RebootRequestFile -Force -ErrorAction SilentlyContinue
-    Set-Content -Path $LastRebootMarker -Value (Get-Date -Format "o")
+    # Record the attempt and consume the request before restarting. If Windows
+    # rejects the restart, restore the request and remove the marker so the
+    # watchdog can retry instead of exiting without supervision.
+    $markerWritten = $false
+    $requestRemoved = $false
+    try {
+        Set-Content -Path $LastRebootMarker -Value (Get-Date -Format "o") -ErrorAction Stop
+        $markerWritten = $true
 
-    Restart-Computer -Force
-    # Restart-Computer starts an async shutdown; stop the watchdog so it does no
-    # further work this cycle.
-    exit
+        Remove-Item -Path $RebootRequestFile -Force -ErrorAction Stop
+        $requestRemoved = $true
+
+        Restart-Computer -Force -ErrorAction Stop
+        # Restart-Computer starts an asynchronous shutdown. Stop the watchdog so
+        # it does no further work during this cycle.
+        exit
+    }
+    catch {
+        $restartError = $_.Exception.Message
+
+        if ($markerWritten) {
+            Remove-Item -Path $LastRebootMarker -Force -ErrorAction SilentlyContinue
+        }
+
+        if ($requestRemoved -and $requestRaw) {
+            try {
+                Set-Content -Path $RebootRequestFile -Value $requestRaw -NoNewline -ErrorAction Stop
+            }
+            catch {
+                Write-Log "Failed to restore reboot request after restart failure ($($_.Exception.Message))"
+            }
+        }
+
+        Write-Log "Failed to restart the PC ($restartError) - watchdog will continue"
+        return
+    }
 }
 
 # Ensure app is running
@@ -298,6 +339,8 @@ while ($true) {
     }
 
     while (!(Test-Connection -ComputerName "8.8.8.8" -Count 1 -Quiet)) {
+        # A local MDB/USB recovery must not wait for internet connectivity.
+        Invoke-RebootIfRequested
         Write-Log -Message "No internet connection detected. Retrying in 5 seconds..."
         Start-Sleep -Seconds 5
     }

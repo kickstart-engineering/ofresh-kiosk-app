@@ -14,7 +14,8 @@ Runs as the boot shell (admin). Keeps `OfreshKioskApp.exe` alive and, on each lo
   watchdog is). A full reboot is the only reliable way to re-enumerate a CH340 stuck
   off the bus. The request is validated for freshness (`$RebootRequestMaxAgeMinutes`)
   and reboots are rate-limited (`$MinMinutesBetweenReboots`, persisted in
-  `C:\logs\last-watchdog-reboot.txt`) so a permanently dead device can't reboot-loop.
+  `C:\logs\last-watchdog-reboot.txt`) to prevent rapid repeated reboots. The watchdog
+  checks requests while offline and retains the request if Windows rejects the restart.
 
 The app side of this signal lives in `ofresh-kiosk` →
 `kiosk-app/src/main/picovend-mdb.ts` (`maybeRequestReboot`). Full context:
